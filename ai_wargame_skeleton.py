@@ -316,14 +316,23 @@ class Game:
         unit = self.get(coords.src)
         if unit is None or unit.player != self.next_player:
             return False
-        unit = self.get(coords.dst)
-        return (unit is None)
+        if abs(coords.src.row-coords.dst.row)> 1 or abs(coords.src.col-coords.dst.col)> 1 :
+            return False
+        return True
 
     def perform_move(self, coords : CoordPair) -> Tuple[bool,str]:
         """Validate and perform a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
         if self.is_valid_move(coords):
-            self.set(coords.dst,self.get(coords.src))
-            self.set(coords.src,None)
+            currentUnit = self.get(coords.src)
+            destUnit = self.get(coords.dst)
+            if destUnit is not None and destUnit.player != self.next_player:
+                currentUnit.mod_health(-destUnit.damage_amount(currentUnit))
+                destUnit.mod_health(-currentUnit.damage_amount(destUnit))
+            elif destUnit is not None:
+                destUnit.mod_health(currentUnit.repair_amount(destUnit))
+            else:
+                self.set(coords.dst,self.get(coords.src))
+                self.set(coords.src,None)
             return (True,"")
         return (False,"invalid move")
 
