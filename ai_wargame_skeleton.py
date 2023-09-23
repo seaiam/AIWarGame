@@ -318,6 +318,9 @@ class Game:
             return False
         if abs(coords.src.row-coords.dst.row)> 1 or abs(coords.src.col-coords.dst.col)> 1 :
             return False
+        if self.is_engaged(coords.src) and (unit.type==UnitType.AI or unit.type==UnitType.Firewall or unit.type==UnitType.Program):
+            print('Unit is engaged')
+            return False
         return True
 
     def is_engaged(self, coord: Coord) -> bool:
