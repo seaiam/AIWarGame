@@ -146,6 +146,17 @@ class Coord:
         yield Coord(self.row+1,self.col)
         yield Coord(self.row,self.col+1)
 
+    def iter_surrounding(self) -> Iterable[Coord]:
+        """Iterates over adjacent Coords."""
+        yield Coord(self.row-1,self.col)
+        yield Coord(self.row,self.col-1)
+        yield Coord(self.row+1,self.col)
+        yield Coord(self.row+1,self.col+1)
+        yield Coord(self.row,self.col+1)
+        yield Coord(self.row+1,self.col-1)
+        yield Coord(self.row-1,self.col+1)
+        yield Coord(self.row-1,self.col-1)
+
     @classmethod
     def from_string(cls, s : str) -> Coord | None:
         """Create a Coord from a string. ex: D2."""
