@@ -318,7 +318,17 @@ class Game:
             return False
         if abs(coords.src.row-coords.dst.row)> 1 or abs(coords.src.col-coords.dst.col)> 1 :
             return False
+        if self.is_engaged(coords.src) and (unit.type==UnitType.AI or unit.type==UnitType.Firewall or unit.type==UnitType.Program):
+            print('Unit is engaged')
+            return False
         return True
+
+    def is_engaged(self, coord: Coord) -> bool:
+        """Check if there is opponant in the adjacent coordinates to the given coordinate."""
+        for adjacent_coord in coord.iter_adjacent():
+            if self.is_valid_coord(adjacent_coord) and not self.is_empty(adjacent_coord) and self.get(adjacent_coord).player!= self.next_player:
+                return True
+        return False       
 
     def perform_move(self, coords : CoordPair) -> Tuple[bool,str]:
         """Validate and perform a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
