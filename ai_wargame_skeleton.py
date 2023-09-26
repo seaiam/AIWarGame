@@ -146,6 +146,17 @@ class Coord:
         yield Coord(self.row+1,self.col)
         yield Coord(self.row,self.col+1)
 
+    def iter_surrounding(self) -> Iterable[Coord]:
+        """Iterates over adjacent Coords."""
+        yield Coord(self.row-1,self.col)
+        yield Coord(self.row,self.col-1)
+        yield Coord(self.row+1,self.col)
+        yield Coord(self.row+1,self.col+1)
+        yield Coord(self.row,self.col+1)
+        yield Coord(self.row+1,self.col-1)
+        yield Coord(self.row-1,self.col+1)
+        yield Coord(self.row-1,self.col-1)
+
     @classmethod
     def from_string(cls, s : str) -> Coord | None:
         """Create a Coord from a string. ex: D2."""
@@ -318,7 +329,11 @@ class Game:
             return False
         if abs(coords.src.row-coords.dst.row)> 1 or abs(coords.src.col-coords.dst.col)> 1 :
             return False
+        if self.is_engaged(coords.src) and (unit.type==UnitType.AI or unit.type==UnitType.Firewall or unit.type==UnitType.Program):
+            print('Unit is engaged')
+            return False
         return True
+
     
     def is_permissible_move(self, coords : CoordPair) -> bool:
         """To verify that attackers and defenders are doing permissible move"""
@@ -343,6 +358,16 @@ class Game:
                 return True
                 
             
+
+
+    def is_engaged(self, coord: Coord) -> bool:
+        """Check if there is opponant in the adjacent coordinates to the given coordinate."""
+        for adjacent_coord in coord.iter_adjacent():
+            if self.is_valid_coord(adjacent_coord) and not self.is_empty(adjacent_coord) and self.get(adjacent_coord).player!= self.next_player:
+                return True
+        return False     
+
+
     def perform_move(self, coords : CoordPair) -> Tuple[bool,str]:
         """Validate and perform a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
         if self.is_valid_move(coords) and self.is_permissible_move(coords):
@@ -353,6 +378,11 @@ class Game:
                 destUnit.mod_health(-currentUnit.damage_amount(destUnit))
             elif destUnit is not None:
                 destUnit.mod_health(currentUnit.repair_amount(destUnit))
+            if destUnit==currentUnit: #self destruction
+                self.mod_health(coords.src,-currentUnit.health)
+                for suroundings in coords.src.iter_surrounding():
+                    if self.is_valid_coord(suroundings) and self.get(suroundings) is not None:
+                        self.mod_health(suroundings,-2)
             else:
                 self.set(coords.dst,self.get(coords.src))
                 self.set(coords.src,None)
