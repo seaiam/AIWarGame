@@ -329,8 +329,7 @@ class Game:
             return False
         if abs(coords.src.row-coords.dst.row)> 1 or abs(coords.src.col-coords.dst.col)> 1 :
             return False
-        if self.is_engaged(coords.src) and (unit.type==UnitType.AI or unit.type==UnitType.Firewall or unit.type==UnitType.Program):
-            print('Unit is engaged')
+        if self.is_engaged(coords.src) and (unit.type==UnitType.AI or unit.type==UnitType.Firewall or unit.type==UnitType.Program) and self.get(coords.dst) is None:
             return False
         return True
 
@@ -374,15 +373,15 @@ class Game:
             currentUnit = self.get(coords.src)
             destUnit = self.get(coords.dst)
             if destUnit is not None and destUnit.player != self.next_player:
-                currentUnit.mod_health(-destUnit.damage_amount(currentUnit))
                 destUnit.mod_health(-currentUnit.damage_amount(destUnit))
+                currentUnit.mod_health(-destUnit.damage_amount(currentUnit))
+            elif destUnit==currentUnit: #self destruction
+                self.mod_health(coords.src,-currentUnit.health)
+                for surounding in coords.src.iter_surrounding():
+                    if self.is_valid_coord(surounding) and self.get(surounding) is not None:
+                        self.mod_health(surounding,-2)
             elif destUnit is not None:
                 destUnit.mod_health(currentUnit.repair_amount(destUnit))
-            if destUnit==currentUnit: #self destruction
-                self.mod_health(coords.src,-currentUnit.health)
-                for suroundings in coords.src.iter_surrounding():
-                    if self.is_valid_coord(suroundings) and self.get(suroundings) is not None:
-                        self.mod_health(suroundings,-2)
             else:
                 self.set(coords.dst,self.get(coords.src))
                 self.set(coords.src,None)
