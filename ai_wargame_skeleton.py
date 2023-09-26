@@ -334,6 +334,32 @@ class Game:
             return False
         return True
 
+    
+    def is_permissible_move(self, coords : CoordPair) -> bool:
+        """To verify that attackers and defenders are doing permissible move"""
+        unit = self.get(coords.src)
+        if unit.player == Player.Attacker:
+            if (unit.type==UnitType.AI or unit.type==UnitType.Firewall or unit.type==UnitType.Program):
+                if (coords.src.row-coords.dst.row)>0  or (coords.src.col-coords.dst.col)>0 :
+                    return True
+                else:
+                    print("Wrong move! Attacker's AI, Firewall and Program can only move up or left")
+                    return False
+            else: 
+                return True
+        else: 
+            if (unit.type==UnitType.AI or unit.type==UnitType.Firewall or unit.type==UnitType.Program):
+                if (coords.src.row-coords.dst.row)<0  or (coords.src.col-coords.dst.col)<0 :
+                    return True
+                else:
+                    print("Wrong move! Defender's AI, Firewall and Program can only move down or right")
+                    return False
+            else: 
+                return True
+                
+            
+
+
     def is_engaged(self, coord: Coord) -> bool:
         """Check if there is opponant in the adjacent coordinates to the given coordinate."""
         for adjacent_coord in coord.iter_adjacent():
@@ -341,9 +367,10 @@ class Game:
                 return True
         return False     
 
+
     def perform_move(self, coords : CoordPair) -> Tuple[bool,str]:
         """Validate and perform a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
-        if self.is_valid_move(coords):
+        if self.is_valid_move(coords) and self.is_permissible_move(coords):
             currentUnit = self.get(coords.src)
             destUnit = self.get(coords.dst)
             if destUnit is not None and destUnit.player != self.next_player:
