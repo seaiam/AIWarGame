@@ -253,6 +253,7 @@ class Stats:
 @dataclass(slots=True)
 class Game:
 
+
     """Representation of the game state."""
     board: list[list[Unit | None]] = field(default_factory=list)
     next_player: Player = Player.Attacker
@@ -342,6 +343,7 @@ class Game:
         if unit.player == Player.Attacker:
             if (unit.type==UnitType.AI or unit.type==UnitType.Firewall or unit.type==UnitType.Program):
                 if (coords.src.row-coords.dst.row)>=0  or (coords.src.col-coords.dst.col)>=0 :
+                if (coords.src.row-coords.dst.row)>=0  or (coords.src.col-coords.dst.col)>=0 :
                     return True
                 else:
                     print("Wrong move! Attacker's AI, Firewall and Program can only move up or left")
@@ -350,6 +352,7 @@ class Game:
                 return True
         else: 
             if (unit.type==UnitType.AI or unit.type==UnitType.Firewall or unit.type==UnitType.Program):
+                if (coords.src.row-coords.dst.row)<=0  or (coords.src.col-coords.dst.col)<=0 :
                 if (coords.src.row-coords.dst.row)<=0  or (coords.src.col-coords.dst.col)<=0 :
                     return True
                 else:
@@ -360,6 +363,7 @@ class Game:
                 
     def is_engaged(self, coord: Coord) -> bool:
         """Check if there is opponent in the adjacent coordinates to the given coordinate."""
+        """Check if there is opponent in the adjacent coordinates to the given coordinate."""
         for adjacent_coord in coord.iter_adjacent():
             if self.is_valid_coord(adjacent_coord) and not self.is_empty(adjacent_coord) and self.get(adjacent_coord).player!= self.next_player:
                 return True
@@ -369,10 +373,10 @@ class Game:
     def attack_unit(self, destUnit: Unit, currentUnit: Unit, coords : CoordPair):
         damageToDest = currentUnit.damage_amount(destUnit)
         damageToUnit = destUnit.damage_amount(currentUnit)
-        destUnit.mod_health(-damageToDest)
-        currentUnit.mod_health(-damageToUnit)
+        self.mod_health(coords.dst,-damageToDest)
+        self.mod_health(coords.src,-damageToUnit)
         logger.info(f"""{currentUnit.player.name} attacks {destUnit.player.name} and inflicts {damageToDest} damage.
-        {destUnit.player.name} inflicts {damageToUnit} damage to {currentUnit.playe.name}.""")
+        {destUnit.player.name} inflicts {damageToUnit} damage to {currentUnit.player.name}.""")
     
     #self destruct
     def self_destruct(self, currentUnit: Unit, coords : CoordPair):
@@ -394,14 +398,17 @@ class Game:
             return False
         logger.info(f"{currentUnit.type.name} repairs {destUnit.type.name} by {repair}")
         print(f"{currentUnit.type.name} repairs {destUnit.type.name} by {repair}")
-        destUnit.mod_health(repair)
+        self.mod_health(coords.dst,repair)
 
     def perform_move(self, coords : CoordPair) -> Tuple[bool,str]:
         """Validate and perform a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
         if self.is_valid_move(coords) and self.is_permissible_move(coords):
             
+            
             currentUnit = self.get(coords.src)
             destUnit = self.get(coords.dst)
+            logger.info(f"{currentUnit.type.name} at {coords.src} moves in on {coords.dst}.")
+            #if destUnit is adversary unit, attack it
             logger.info(f"{currentUnit.type.name} at {coords.src} moves in on {coords.dst}.")
             #if destUnit is adversary unit, attack it
             if destUnit is not None and destUnit.player != self.next_player:
@@ -410,14 +417,23 @@ class Game:
             elif destUnit==currentUnit:
                 self.self_destruct(currentUnit, coords)
             #if destUnit is friendly unit, heal
+                self.attack_unit(destUnit,currentUnit, coords)
+            #if destUnit is same unit, self destruct
+            elif destUnit==currentUnit:
+                self.self_destruct(currentUnit, coords)
+            #if destUnit is friendly unit, heal
             elif destUnit is not None:
+                self.repair_unit(destUnit, currentUnit, coords)
+            #else, move
                 self.repair_unit(destUnit, currentUnit, coords)
             #else, move
             else:
                 self.set(coords.dst,self.get(coords.src))
                 self.set(coords.src,None)
             
+            
             return (True,"")
+        
         
         return (False,"invalid move")
 
@@ -666,13 +682,25 @@ def main():
      The game type is {game_type.name}. """
     
     logger.info(gameParameters)
+    logFileName = f"gameTrace-{options.alpha_beta}-{options.max_time}-{options.max_turns}"
+    logging.basicConfig(filename=logFileName, level=logging.INFO)
+    
+    gameParameters = f"""The value of the timeout is {options.max_time}.
+     The max number of turns {options.max_turns}.
+     The game type is {game_type.name}. """
+    
+    logger.info(gameParameters)
     # the main game loop
     while True:
         print()
         print(game)
         logger.info(f"\n{game}")
+        logger.info(f"\n{game}")
         winner = game.has_winner()
         if winner is not None:
+            winningMessage = f"{winner.name} wins!"
+            print(winningMessage)
+            logger.info(winningMessage)
             winningMessage = f"{winner.name} wins!"
             print(winningMessage)
             logger.info(winningMessage)
@@ -691,7 +719,7 @@ def main():
             else:
                 print("Computer doesn't know what to do!!!")
                 exit(1)
-    logger.info(f"Game ended after {turns_played} turns")
+    logger.info(f"Game ended after {game.turns_played} turns")
     logging.shutdown()
 ##############################################################################################################
 
