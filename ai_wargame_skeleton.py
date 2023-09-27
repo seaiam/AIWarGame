@@ -371,19 +371,19 @@ class Game:
         damageToUnit = destUnit.damage_amount(currentUnit)
         destUnit.mod_health(-damageToDest)
         currentUnit.mod_health(-damageToUnit)
-        logger.info(f"""{currentUnit.player} attacks {destUnit.player} and inflicts {damageToDest} damage.
-        {destUnit.player} inflicts {damageToUnit} damage to {currentUnit.player}.""")
+        logger.info(f"""{currentUnit.player.name} attacks {destUnit.player.name} and inflicts {damageToDest} damage.
+        {destUnit.player.name} inflicts {damageToUnit} damage to {currentUnit.playe.name}.""")
     
     #self destruct
     def self_destruct(self, currentUnit: Unit, coords : CoordPair):
         logger.info(f"{currentUnit.player.name} self destructs")
-        print(f"{currentUnit.player} self destructs")
+        print(f"{currentUnit.player.name} self destructs")
         self.mod_health(coords.src,-currentUnit.health)
         for surounding in coords.src.iter_surrounding():
             collateral = self.get(surounding)
             if self.is_valid_coord(surounding) and collateral is not None:
-                print(f"{collateral.player}'s {collateral.type.name} at {surounding} receives 2 damage")
-                logger.info(f"{collateral.player}'s {collateral.type.name} at {surounding} receives 2 damage")
+                print(f"{collateral.player.name}'s {collateral.type.name} at {surounding} receives 2 damage")
+                logger.info(f"{collateral.player.name}'s {collateral.type.name} at {surounding} receives 2 damage")
                 self.mod_health(surounding,-2)
 
     # currentUnit repairs destUnit
