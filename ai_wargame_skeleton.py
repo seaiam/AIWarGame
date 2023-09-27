@@ -8,10 +8,12 @@ from time import sleep
 from typing import Tuple, TypeVar, Type, Iterable, ClassVar
 import random
 import requests
+import logging
 
 # maximum and minimum values for our heuristic scores (usually represents an end of game condition)
 MAX_HEURISTIC_SCORE = 2000000000
 MIN_HEURISTIC_SCORE = -2000000000
+logger = logging.getLogger("")
 
 class UnitType(Enum):
     """Every unit type."""
@@ -250,6 +252,7 @@ class Stats:
 
 @dataclass(slots=True)
 class Game:
+
     """Representation of the game state."""
     board: list[list[Unit | None]] = field(default_factory=list)
     next_player: Player = Player.Attacker
@@ -333,13 +336,12 @@ class Game:
             return False
         return True
 
-    
     def is_permissible_move(self, coords : CoordPair) -> bool:
         """To verify that attackers and defenders are doing permissible move"""
         unit = self.get(coords.src)
         if unit.player == Player.Attacker:
             if (unit.type==UnitType.AI or unit.type==UnitType.Firewall or unit.type==UnitType.Program):
-                if (coords.src.row-coords.dst.row)>0  or (coords.src.col-coords.dst.col)>0 :
+                if (coords.src.row-coords.dst.row)>=0  or (coords.src.col-coords.dst.col)>=0 :
                     return True
                 else:
                     print("Wrong move! Attacker's AI, Firewall and Program can only move up or left")
@@ -348,7 +350,7 @@ class Game:
                 return True
         else: 
             if (unit.type==UnitType.AI or unit.type==UnitType.Firewall or unit.type==UnitType.Program):
-                if (coords.src.row-coords.dst.row)<0  or (coords.src.col-coords.dst.col)<0 :
+                if (coords.src.row-coords.dst.row)<=0  or (coords.src.col-coords.dst.col)<=0 :
                     return True
                 else:
                     print("Wrong move! Defender's AI, Firewall and Program can only move down or right")
@@ -356,36 +358,67 @@ class Game:
             else: 
                 return True
                 
-            
-
-
     def is_engaged(self, coord: Coord) -> bool:
-        """Check if there is opponant in the adjacent coordinates to the given coordinate."""
+        """Check if there is opponent in the adjacent coordinates to the given coordinate."""
         for adjacent_coord in coord.iter_adjacent():
             if self.is_valid_coord(adjacent_coord) and not self.is_empty(adjacent_coord) and self.get(adjacent_coord).player!= self.next_player:
                 return True
         return False     
+    
+    #destUnit gets attacked by current unit
+    def attack_unit(self, destUnit: Unit, currentUnit: Unit, coords : CoordPair):
+        damageToDest = currentUnit.damage_amount(destUnit)
+        damageToUnit = destUnit.damage_amount(currentUnit)
+        destUnit.mod_health(-damageToDest)
+        currentUnit.mod_health(-damageToUnit)
+        logger.info(f"""{currentUnit.player.name} attacks {destUnit.player.name} and inflicts {damageToDest} damage.
+        {destUnit.player.name} inflicts {damageToUnit} damage to {currentUnit.playe.name}.""")
+    
+    #self destruct
+    def self_destruct(self, currentUnit: Unit, coords : CoordPair):
+        logger.info(f"{currentUnit.player.name} self destructs")
+        print(f"{currentUnit.player.name} self destructs")
+        self.mod_health(coords.src,-currentUnit.health)
+        for surounding in coords.src.iter_surrounding():
+            collateral = self.get(surounding)
+            if self.is_valid_coord(surounding) and collateral is not None:
+                print(f"{collateral.player.name}'s {collateral.type.name} at {surounding} receives 2 damage")
+                logger.info(f"{collateral.player.name}'s {collateral.type.name} at {surounding} receives 2 damage")
+                self.mod_health(surounding,-2)
 
+    # currentUnit repairs destUnit
+    def repair_unit(self,destUnit: Unit, currentUnit: Unit, coords : CoordPair ):
+        repair = currentUnit.repair_amount(destUnit)
+        if repair == 0 or destUnit.health == 9:
+            print(f"{currentUnit.type.name} can't repair {destUnit.type.name}")
+            return False
+        logger.info(f"{currentUnit.type.name} repairs {destUnit.type.name} by {repair}")
+        print(f"{currentUnit.type.name} repairs {destUnit.type.name} by {repair}")
+        destUnit.mod_health(repair)
 
     def perform_move(self, coords : CoordPair) -> Tuple[bool,str]:
         """Validate and perform a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
         if self.is_valid_move(coords) and self.is_permissible_move(coords):
+            
             currentUnit = self.get(coords.src)
             destUnit = self.get(coords.dst)
+            logger.info(f"{currentUnit.type.name} at {coords.src} moves in on {coords.dst}.")
+            #if destUnit is adversary unit, attack it
             if destUnit is not None and destUnit.player != self.next_player:
-                destUnit.mod_health(-currentUnit.damage_amount(destUnit))
-                currentUnit.mod_health(-destUnit.damage_amount(currentUnit))
-            elif destUnit==currentUnit: #self destruction
-                self.mod_health(coords.src,-currentUnit.health)
-                for surounding in coords.src.iter_surrounding():
-                    if self.is_valid_coord(surounding) and self.get(surounding) is not None:
-                        self.mod_health(surounding,-2)
+                self.attack_unit(destUnit,currentUnit, coords)
+            #if destUnit is same unit, self destruct
+            elif destUnit==currentUnit:
+                self.self_destruct(currentUnit, coords)
+            #if destUnit is friendly unit, heal
             elif destUnit is not None:
-                destUnit.mod_health(currentUnit.repair_amount(destUnit))
+                self.repair_unit(destUnit, currentUnit, coords)
+            #else, move
             else:
                 self.set(coords.dst,self.get(coords.src))
                 self.set(coords.src,None)
+            
             return (True,"")
+        
         return (False,"invalid move")
 
     def next_turn(self):
@@ -625,14 +658,24 @@ def main():
 
     # create a new game
     game = Game(options=options)
-
+    logFileName = f"gameTrace-{options.alpha_beta}-{options.max_time}-{options.max_turns}"
+    logging.basicConfig(filename=logFileName, level=logging.INFO)
+    
+    gameParameters = f"""The value of the timeout is {options.max_time}.
+     The max number of turns {options.max_turns}.
+     The game type is {game_type.name}. """
+    
+    logger.info(gameParameters)
     # the main game loop
     while True:
         print()
         print(game)
+        logger.info(f"\n{game}")
         winner = game.has_winner()
         if winner is not None:
-            print(f"{winner.name} wins!")
+            winningMessage = f"{winner.name} wins!"
+            print(winningMessage)
+            logger.info(winningMessage)
             break
         if game.options.game_type == GameType.AttackerVsDefender:
             game.human_turn()
@@ -648,7 +691,8 @@ def main():
             else:
                 print("Computer doesn't know what to do!!!")
                 exit(1)
-
+    logger.info(f"Game ended after {turns_played} turns")
+    logging.shutdown()
 ##############################################################################################################
 
 if __name__ == '__main__':
