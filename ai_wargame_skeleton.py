@@ -343,7 +343,6 @@ class Game:
         if unit.player == Player.Attacker:
             if (unit.type==UnitType.AI or unit.type==UnitType.Firewall or unit.type==UnitType.Program):
                 if (coords.src.row-coords.dst.row)>=0  or (coords.src.col-coords.dst.col)>=0 :
-                if (coords.src.row-coords.dst.row)>=0  or (coords.src.col-coords.dst.col)>=0 :
                     return True
                 else:
                     print("Wrong move! Attacker's AI, Firewall and Program can only move up or left")
@@ -353,7 +352,6 @@ class Game:
         else: 
             if (unit.type==UnitType.AI or unit.type==UnitType.Firewall or unit.type==UnitType.Program):
                 if (coords.src.row-coords.dst.row)<=0  or (coords.src.col-coords.dst.col)<=0 :
-                if (coords.src.row-coords.dst.row)<=0  or (coords.src.col-coords.dst.col)<=0 :
                     return True
                 else:
                     print("Wrong move! Defender's AI, Firewall and Program can only move down or right")
@@ -362,7 +360,6 @@ class Game:
                 return True
                 
     def is_engaged(self, coord: Coord) -> bool:
-        """Check if there is opponent in the adjacent coordinates to the given coordinate."""
         """Check if there is opponent in the adjacent coordinates to the given coordinate."""
         for adjacent_coord in coord.iter_adjacent():
             if self.is_valid_coord(adjacent_coord) and not self.is_empty(adjacent_coord) and self.get(adjacent_coord).player!= self.next_player:
