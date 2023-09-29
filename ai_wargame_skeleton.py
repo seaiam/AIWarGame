@@ -538,6 +538,7 @@ class Game:
     def has_winner(self) -> Player | None:
         """Check if the game is over and returns winner"""
         if self.options.max_turns is not None and self.turns_played >= self.options.max_turns:
+            print("Maximum number of turns reached!")
             return Player.Defender
         elif self._attacker_has_ai:
             if self._defender_has_ai:
