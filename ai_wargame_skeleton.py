@@ -538,6 +538,7 @@ class Game:
     def has_winner(self) -> Player | None:
         """Check if the game is over and returns winner"""
         if self.options.max_turns is not None and self.turns_played >= self.options.max_turns:
+            print("Maximum number of turns reached.")
             return Player.Defender
         elif self._attacker_has_ai:
             if self._defender_has_ai:
@@ -646,6 +647,7 @@ def main():
     parser.add_argument('--max_time', type=float, help='maximum search time')
     parser.add_argument('--game_type', type=str, default="manual", help='game type: auto|attacker|defender|manual')
     parser.add_argument('--broker', type=str, help='play via a game broker')
+    parser.add_argument('--max_turns', type=int, help='maximum turns' )
     args = parser.parse_args()
 
     # parse the game type
@@ -668,6 +670,8 @@ def main():
         options.max_time = args.max_time
     if args.broker is not None:
         options.broker = args.broker
+    if args.max_turns is not None:
+        options.max_turns = args.max_turns
 
     # create a new game
     game = Game(options=options)
@@ -692,12 +696,8 @@ def main():
         print()
         print(game)
         logger.info(f"\n{game}")
-        logger.info(f"\n{game}")
         winner = game.has_winner()
         if winner is not None:
-            winningMessage = f"{winner.name} wins!"
-            print(winningMessage)
-            logger.info(winningMessage)
             winningMessage = f"{winner.name} wins!"
             print(winningMessage)
             logger.info(winningMessage)
