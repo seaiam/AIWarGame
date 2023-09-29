@@ -406,22 +406,13 @@ class Game:
             destUnit = self.get(coords.dst)
             logger.info(f"{currentUnit.type.name} at {coords.src} moves in on {coords.dst}.")
             #if destUnit is adversary unit, attack it
-            logger.info(f"{currentUnit.type.name} at {coords.src} moves in on {coords.dst}.")
-            #if destUnit is adversary unit, attack it
             if destUnit is not None and destUnit.player != self.next_player:
                 self.attack_unit(destUnit,currentUnit, coords)
             #if destUnit is same unit, self destruct
             elif destUnit==currentUnit:
                 self.self_destruct(currentUnit, coords)
             #if destUnit is friendly unit, heal
-                self.attack_unit(destUnit,currentUnit, coords)
-            #if destUnit is same unit, self destruct
-            elif destUnit==currentUnit:
-                self.self_destruct(currentUnit, coords)
-            #if destUnit is friendly unit, heal
             elif destUnit is not None:
-                self.repair_unit(destUnit, currentUnit, coords)
-            #else, move
                 self.repair_unit(destUnit, currentUnit, coords)
             #else, move
             else:
@@ -676,19 +667,9 @@ def main():
     # create a new game
     game = Game(options=options)
     logFileName = f"gameTrace-{options.alpha_beta}-{options.max_time}-{options.max_turns}"
-    logging.basicConfig(filename=logFileName, level=logging.INFO)
+    logging.basicConfig(filename=logFileName,format='%(message)s', level=logging.INFO)
     
-    gameParameters = f"""The value of the timeout is {options.max_time}.
-     The max number of turns {options.max_turns}.
-     The game type is {game_type.name}. """
-    
-    logger.info(gameParameters)
-    logFileName = f"gameTrace-{options.alpha_beta}-{options.max_time}-{options.max_turns}"
-    logging.basicConfig(filename=logFileName, level=logging.INFO)
-    
-    gameParameters = f"""The value of the timeout is {options.max_time}.
-     The max number of turns {options.max_turns}.
-     The game type is {game_type.name}. """
+    gameParameters = f"""The value of the timeout is {options.max_time}.\nThe max number of turns {options.max_turns}.\nThe game type is {game_type.name}. """
     
     logger.info(gameParameters)
     # the main game loop
