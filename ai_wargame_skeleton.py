@@ -331,6 +331,8 @@ class Game:
         unit = self.get(coords.src)
         if unit is None or unit.player != self.next_player:
             return False
+        if self.get(coords.dst).player == self.next_player and self.get(coords.dst).health == 9:
+            return False
         if abs(coords.src.row-coords.dst.row)> 1 or abs(coords.src.col-coords.dst.col)> 1 :
             return False
         if self.is_engaged(coords.src) and (unit.type==UnitType.AI or unit.type==UnitType.Firewall or unit.type==UnitType.Program) and self.get(coords.dst) is None:
@@ -669,7 +671,7 @@ def main():
     logFileName = f"gameTrace-{options.alpha_beta}-{options.max_time}-{options.max_turns}"
     logging.basicConfig(filename=logFileName,format='%(message)s', level=logging.INFO)
     
-    gameParameters = f"""The value of the timeout is {options.max_time}.\nThe max number of turns {options.max_turns}.\nThe game type is {game_type.name}. """
+    gameParameters = f"""The value of the timeout is {options.max_time} seconds.\nThe max number of turns {options.max_turns}.\nThe game type is {game_type.name}. """
     
     logger.info(gameParameters)
     # the main game loop
