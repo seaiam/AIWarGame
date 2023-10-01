@@ -331,7 +331,7 @@ class Game:
         unit = self.get(coords.src)
         if unit is None or unit.player != self.next_player:
             return False
-        if self.get(coords.dst).player == self.next_player and self.get(coords.dst).health == 9:
+        if self.get(coords.dst) is not None and self.get(coords.dst)!= unit and self.get(coords.dst).player == self.next_player and self.get(coords.dst).health == 9:
             return False
         if abs(coords.src.row-coords.dst.row)> 1 or abs(coords.src.col-coords.dst.col)> 1 :
             return False
