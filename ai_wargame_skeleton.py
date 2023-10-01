@@ -343,21 +343,23 @@ class Game:
         """To verify that attackers and defenders are doing permissible move"""
         unit = self.get(coords.src)
         if unit.player == Player.Attacker:
+            # down or right  return false 
             if (unit.type==UnitType.AI or unit.type==UnitType.Firewall or unit.type==UnitType.Program):
-                if (coords.src.row-coords.dst.row)>=0  or (coords.src.col-coords.dst.col)>=0 :
-                    return True
-                else:
+                if (coords.src.row-coords.dst.row)<0  or (coords.src.col-coords.dst.col)<0 :
                     print("Wrong move! Attacker's AI, Firewall and Program can only move up or left")
                     return False
+                else:
+                    return True
             else: 
                 return True
         else: 
+            # up or left return false
             if (unit.type==UnitType.AI or unit.type==UnitType.Firewall or unit.type==UnitType.Program):
-                if (coords.src.row-coords.dst.row)<=0  or (coords.src.col-coords.dst.col)<=0 :
-                    return True
-                else:
+                if (coords.src.row-coords.dst.row)>0  or (coords.src.col-coords.dst.col)>0 :
                     print("Wrong move! Defender's AI, Firewall and Program can only move down or right")
                     return False
+                else:
+                    return True
             else: 
                 return True
                 

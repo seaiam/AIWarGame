@@ -16,3 +16,14 @@
  Fatima El Fouladi     | 40108832    | seaiam    |
 Anum Siddiqui     | 40129811    | AnumSidd    | 
  Raya Maria Lahoud     | 40129965    | rayalahoud    |
+ 
+## :computer: How to run the game
+**On Mac OS**
+ 1. Clone the repository
+ 2. run ``python3 -m venv venv`` NOTE: could be python instead of python3
+ 3. activate virtual environment by running ```source venv/bin/activate```
+
+**On Windows**
+ 1. Clone the repository 
+ 2. run ``python3 -m venv venv`` NOTE: could be python instead of python3
+ 3. activate virtual environment by running ```venv\Scripts\activate```
