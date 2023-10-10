@@ -331,7 +331,7 @@ class Game:
         unit = self.get(coords.src)
         if unit is None or unit.player != self.next_player:
             return False
-        if self.get(coords.dst) is not None and self.get(coords.dst)!= unit and self.get(coords.dst).player == self.next_player and self.get(coords.dst).health == 9:
+        if self.get(coords.dst) is not None and unit.repair_amount(self.get(coords.dst))== 0 and self.get(coords.dst)!= unit or self.get(coords.dst) is not None and self.get(coords.dst)!= unit and self.get(coords.dst).player == self.next_player and self.get(coords.dst).health == 9:
             return False
         if abs(coords.src.row-coords.dst.row)> 1 or abs(coords.src.col-coords.dst.col)> 1 :
             return False
@@ -535,13 +535,12 @@ class Game:
         if self.options.max_turns is not None and self.turns_played >= self.options.max_turns:
             print("Maximum number of turns reached.")
             return Player.Defender
-        elif self._attacker_has_ai:
+        if self._attacker_has_ai:
             if self._defender_has_ai:
                 return None
             else:
                 return Player.Attacker    
-        elif self._defender_has_ai:
-            return Player.Defender
+        return Player.Defender
 
     def move_candidates(self) -> Iterable[CoordPair]:
         """Generate valid move candidates for the next player."""
