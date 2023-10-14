@@ -324,6 +324,13 @@ class Game:
             target.mod_health(health_delta)
             self.remove_dead(coord)
 
+    def possible_move(self, coord : Coord) -> Iterable[Coord]:
+        unit = self.get(coord)
+        for dest in coord.iter_adjacent():
+            move = CoordPair(coord, dest)
+            if(self.is_valid_move(move) and self.is_permissible_move(move)):
+                yield dest
+
     def is_valid_move(self, coords : CoordPair) -> bool:
         """Validate a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
         if not self.is_valid_coord(coords.src) or not self.is_valid_coord(coords.dst):
@@ -561,8 +568,7 @@ class Game:
         if len(move_candidates) > 0:
             return (0, move_candidates[0], 1)
         else:
-            return (0, None, 0)
-
+            return (0, None, 0)    
     def suggest_move(self) -> CoordPair | None:
         """Suggest the next move using minimax alpha beta. TODO: REPLACE RANDOM_MOVE WITH PROPER GAME LOGIC!!!"""
         start_time = datetime.now()
