@@ -556,7 +556,7 @@ class Game:
             move.src = src
             for dst in src.iter_adjacent():
                 move.dst = dst
-                if self.is_valid_move(move):
+                if self.is_valid_move(move) and self.is_permissible_move(move):
                     yield move.clone()
             move.dst = src
             yield move.clone()
@@ -568,7 +568,53 @@ class Game:
         if len(move_candidates) > 0:
             return (0, move_candidates[0], 1)
         else:
-            return (0, None, 0)    
+            return (0, None, 0)
+    
+    def get_e0(self, player: Player) -> int:
+        ls = count_player_units(self, player)
+        return (3*ls[0]+3*ls[1]+3*ls[2]+3*ls[3]+9999*ls[4])-(3*ls[5]+3*ls[6]+3*ls[7]+3*ls[8]+9999*ls[9])
+    
+    def count_player_units(self, player: Player) -> List[int]:
+        # player 1 is Attacker, player 2 is defender. Attacker wants to maximize this heuristic and Defender wants to minimize it
+        unit_counts = {
+            "Virus1": 0,
+            "Technical1": 0,
+            "Firewall1": 0,
+            "Program": 0,
+            "AI1": 0,
+            "Virus2": 0,
+            "Technica2": 0,
+            "Firewall2": 0,
+            "Program2": 0,
+            "AI2": 0
+        }
+        for coord in CoordPair.from_dim(self.options.dim).iter_rectangle():
+            unit = self.get(coord)
+            if unit is not None:
+                if unit.player == Player.Attacker:
+                    if unit.type == UnitType.Virus:
+                        unit_counts["Virus1"] += 1
+                    elif unit.type == UnitType.Technical:
+                        unit_counts["Technical1"] += 1
+                    elif unit.type == UnitType.Firewall:
+                        unit_counts["Firewall1"] += 1
+                    elif unit.type == UnitType.Program:
+                        unit_counts["Program1"] += 1 
+                    else:
+                        unit_counts["AI1"] += 1
+                else:
+                    if unit.type == UnitType.Virus:
+                        unit_counts["Virus2"] += 1
+                    elif unit.type == UnitType.Technical:
+                        unit_counts["Technical2"] += 1
+                    elif unit.type == UnitType.Firewall:
+                        unit_counts["Firewall2"] += 1
+                    elif unit.type == UnitType.Program:
+                        unit_counts["Program2"] += 1 
+                    else:
+                        unit_counts["AI2"] += 1   
+        return list(unit_counts.values())
+    
     def suggest_move(self) -> CoordPair | None:
         """Suggest the next move using minimax alpha beta. TODO: REPLACE RANDOM_MOVE WITH PROPER GAME LOGIC!!!"""
         start_time = datetime.now()
