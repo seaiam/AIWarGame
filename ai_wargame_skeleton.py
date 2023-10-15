@@ -4,6 +4,7 @@ import copy
 from datetime import datetime
 from enum import Enum
 from dataclasses import dataclass, field
+import math
 from time import sleep
 from typing import Tuple, TypeVar, Type, Iterable, ClassVar
 import random
@@ -571,7 +572,7 @@ class Game:
             return (0, None, 0)
     
     def get_e0(self, player: Player) -> int:
-        ls = count_player_units(self, player)
+        ls = self.count_player_units(player)
         return (3*ls[0]+3*ls[1]+3*ls[2]+3*ls[3]+9999*ls[4])-(3*ls[5]+3*ls[6]+3*ls[7]+3*ls[8]+9999*ls[9])
     
     def count_player_units(self, player: Player) -> List[int]:
@@ -614,6 +615,51 @@ class Game:
                     else:
                         unit_counts["AI2"] += 1   
         return list(unit_counts.values())
+    
+    def calculate_e0_at_moves(self) -> dict[CoordPair, int]:
+        e0_at_moves = {}
+        for move in self.move_candidates():
+            copy_game = self.clone()
+            copy_game.perform_move(move)
+            e0 = copy_game.get_e0(copy_game.next_player)
+            e0_at_moves[move] = e0
+        return e0_at_moves
+
+    def minimax (self, depth, maximizingPlayer):
+        candidate_move = self.move_candidates()
+        if depth == 0 or self.is_finished():
+            if self.is_finished():
+                winner = self.has_winner().name
+                if winner.isEqual("Attacker"):
+                    return (None, MAX_HEURISTIC_SCORE)
+                elif winner.isEqual("Deffender"):
+                    return (None,MIN_HEURISTIC_SCORE)
+            else: #depth is 0
+                return (None, self.get_e0(Player.Attacker))
+        if maximizingPlayer: #Attacker
+            value = -math.inf
+            bestmove = self.random_move()
+            for move in candidate_move:
+                gameCopy = self.clone()
+                gameCopy.perform_move(move)
+                new_score= gameCopy.minimax(depth-1, False)[1]
+                if new_score>value:
+                    value=new_score
+                    bestmove = move
+            return (bestmove, new_score)
+        else: #minimizing player so Deffender
+            value = math.inf
+            bestmove = self.random_move()
+            for move in candidate_move:
+                gameCopy = self.clone()
+                gameCopy.perform_move(move)
+                new_score= gameCopy.minimax(depth-1, True)[1]
+                if new_score<value:
+                    value=new_score
+                    bestmove = move
+            return (bestmove, new_score)
+            
+  
     
     def suggest_move(self) -> CoordPair | None:
         """Suggest the next move using minimax alpha beta. TODO: REPLACE RANDOM_MOVE WITH PROPER GAME LOGIC!!!"""
