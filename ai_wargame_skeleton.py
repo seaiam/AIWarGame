@@ -110,6 +110,10 @@ class Coord:
     row : int = 0
     col : int = 0
 
+    def __hash__(self):
+        return hash((self.row, self.col))
+
+
     def col_string(self) -> str:
         """Text representation of this Coord's column."""
         coord_char = '?'
@@ -581,10 +585,10 @@ class Game:
             "Virus1": 0,
             "Technical1": 0,
             "Firewall1": 0,
-            "Program": 0,
+            "Program1": 0,
             "AI1": 0,
             "Virus2": 0,
-            "Technica2": 0,
+            "Technical2": 0,
             "Firewall2": 0,
             "Program2": 0,
             "AI2": 0
@@ -595,8 +599,10 @@ class Game:
                 if unit.player == Player.Attacker:
                     if unit.type == UnitType.Virus:
                         unit_counts["Virus1"] += 1
-                    elif unit.type == UnitType.Technical:
-                        unit_counts["Technical1"] += 1
+                    # elif unit.type == UnitType.Technical:
+                    #     unit_counts["Technical1"] += 1
+                    elif unit.type == UnitType.Tech:
+                         unit_counts["Technical1"] += 1
                     elif unit.type == UnitType.Firewall:
                         unit_counts["Firewall1"] += 1
                     elif unit.type == UnitType.Program:
@@ -606,8 +612,10 @@ class Game:
                 else:
                     if unit.type == UnitType.Virus:
                         unit_counts["Virus2"] += 1
-                    elif unit.type == UnitType.Technical:
-                        unit_counts["Technical2"] += 1
+                    # elif unit.type == UnitType.Technical:
+                    #     unit_counts["Technical2"] += 1
+                    elif unit.type == UnitType.Tech:
+                         unit_counts["Technical2"] += 1
                     elif unit.type == UnitType.Firewall:
                         unit_counts["Firewall2"] += 1
                     elif unit.type == UnitType.Program:
@@ -622,7 +630,8 @@ class Game:
             copy_game = self.clone()
             copy_game.perform_move(move)
             e0 = copy_game.get_e0(copy_game.next_player)
-            e0_at_moves[move] = e0
+            e0_at_moves[(move.src.__hash__(), move.dst.__hash__())] = e0
+            #e0_at_moves[move] = e0
         return e0_at_moves
 
     def minimax (self, depth, maximizingPlayer):
@@ -630,9 +639,9 @@ class Game:
         if depth == 0 or self.is_finished():
             if self.is_finished():
                 winner = self.has_winner().name
-                if winner.isEqual("Attacker"):
+                if winner=="Attacker":
                     return (None, MAX_HEURISTIC_SCORE)
-                elif winner.isEqual("Deffender"):
+                elif winner=="Deffender":
                     return (None,MIN_HEURISTIC_SCORE)
             else: #depth is 0
                 return (None, self.get_e0(Player.Attacker))
@@ -642,22 +651,25 @@ class Game:
             for move in candidate_move:
                 gameCopy = self.clone()
                 gameCopy.perform_move(move)
-                new_score= gameCopy.minimax(depth-1, False)[1]
-                if new_score>value:
-                    value=new_score
-                    bestmove = move
-            return (bestmove, new_score)
+                if depth > 0:
+                    test = gameCopy.minimax(depth-1, False)
+                    new_score= test[1]
+                    if new_score>value:
+                        value=new_score
+                        bestmove = move
+                return (bestmove, value)
         else: #minimizing player so Deffender
             value = math.inf
             bestmove = self.random_move()
             for move in candidate_move:
                 gameCopy = self.clone()
                 gameCopy.perform_move(move)
-                new_score= gameCopy.minimax(depth-1, True)[1]
-                if new_score<value:
-                    value=new_score
-                    bestmove = move
-            return (bestmove, new_score)
+                if depth > 0:
+                    new_score= gameCopy.minimax(depth-1, True)[1]
+                    if new_score<value:
+                        value=new_score
+                        bestmove = move
+                return (bestmove, value)
             
   
     
