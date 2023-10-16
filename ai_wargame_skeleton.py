@@ -291,7 +291,7 @@ class Game:
 
         Shallow copy of everything except the board (options and stats are shared).
         """
-        new = copy.copy(self)
+        new = copy.deepcopy(self)
         new.board = copy.deepcopy(self.board)
         return new
 
@@ -599,8 +599,6 @@ class Game:
                 if unit.player == Player.Attacker:
                     if unit.type == UnitType.Virus:
                         unit_counts["Virus1"] += 1
-                    # elif unit.type == UnitType.Technical:
-                    #     unit_counts["Technical1"] += 1
                     elif unit.type == UnitType.Tech:
                          unit_counts["Technical1"] += 1
                     elif unit.type == UnitType.Firewall:
@@ -612,8 +610,6 @@ class Game:
                 else:
                     if unit.type == UnitType.Virus:
                         unit_counts["Virus2"] += 1
-                    # elif unit.type == UnitType.Technical:
-                    #     unit_counts["Technical2"] += 1
                     elif unit.type == UnitType.Tech:
                          unit_counts["Technical2"] += 1
                     elif unit.type == UnitType.Firewall:
@@ -651,6 +647,7 @@ class Game:
             for move in candidate_move:
                 gameCopy = self.clone()
                 gameCopy.perform_move(move)
+                gameCopy.next_turn()
                 new_score= gameCopy.minimax((depth-1), False)[1]
                 if new_score>value:
                     value=new_score
@@ -662,6 +659,7 @@ class Game:
             for move in candidate_move:
                 gameCopy = self.clone()
                 gameCopy.perform_move(move)
+                gameCopy.next_turn()
                 new_score= gameCopy.minimax((depth-1), True)[1]
                 if new_score<value:
                         value=new_score
@@ -673,7 +671,7 @@ class Game:
         """Suggest the next move using minimax alpha beta. TODO: REPLACE RANDOM_MOVE WITH PROPER GAME LOGIC!!!"""
         start_time = datetime.now()
         # (score, move, avg_depth) = self.random_move()
-        (move, score)= self.minimax(4,True)
+        (move, score)= self.minimax(2,True)
         elapsed_seconds = (datetime.now() - start_time).total_seconds()
         self.stats.total_seconds += elapsed_seconds
         print(f"Heuristic score: {score}")
