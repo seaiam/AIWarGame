@@ -439,7 +439,7 @@ class Game:
             return (True,"")
         
         
-        return (False,"invalid move")
+        return (True,"invalid move")
 
     def next_turn(self):
         """Transitions game to the next turn."""
