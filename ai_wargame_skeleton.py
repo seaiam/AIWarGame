@@ -261,7 +261,7 @@ class Game:
 
     """Representation of the game state."""
     board: list[list[Unit | None]] = field(default_factory=list)
-    next_player: Player = Player.Attacker
+    curr_player: Player = Player.Attacker
     turns_played : int = 0
     options: Options = field(default_factory=Options)
     stats: Stats = field(default_factory=Stats)
@@ -290,8 +290,8 @@ class Game:
         """Make a new copy of a game for minimax recursion.
         Shallow copy of everything except the board (options and stats are shared).
         """
-        new = copy.copy(self)
-        new.board = copy.deepcopy(self.board)
+        new = copy.deepcopy(self)
+        # new.board = copy.deepcopy(self.board)
         return new
 
     def is_empty(self, coord : Coord) -> bool:
@@ -340,9 +340,9 @@ class Game:
         if not self.is_valid_coord(coords.src) or not self.is_valid_coord(coords.dst):
             return False
         unit = self.get(coords.src)
-        if unit is None or unit.player != self.next_player:
+        if unit is None or unit.player != self.curr_player:
             return False
-        if self.get(coords.dst) is not None and unit.repair_amount(self.get(coords.dst))== 0 and self.get(coords.dst)!= unit or self.get(coords.dst) is not None and self.get(coords.dst)!= unit and self.get(coords.dst).player == self.next_player and self.get(coords.dst).health == 9:
+        if self.get(coords.dst) is not None and unit.repair_amount(self.get(coords.dst))== 0 and self.get(coords.dst)!= unit or self.get(coords.dst) is not None and self.get(coords.dst)!= unit and self.get(coords.dst).player == self.curr_player and self.get(coords.dst).health == 9:
             return False
         if abs(coords.src.row-coords.dst.row)> 1 or abs(coords.src.col-coords.dst.col)> 1 :
             return False
@@ -357,7 +357,7 @@ class Game:
             # down or right  return false 
             if (unit.type==UnitType.AI or unit.type==UnitType.Firewall or unit.type==UnitType.Program):
                 if (coords.src.row-coords.dst.row)<0  or (coords.src.col-coords.dst.col)<0 :
-                    ##print("Wrong move! Attacker's AI, Firewall and Program can only move up or left")
+                    #print("Wrong move! Attacker's AI, Firewall and Program can only move up or left")
                     return False
                 else:
                     return True
@@ -377,7 +377,58 @@ class Game:
     def is_engaged(self, coord: Coord) -> bool:
         """Check if there is opponent in the adjacent coordinates to the given coordinate."""
         for adjacent_coord in coord.iter_adjacent():
-            if self.is_valid_coord(adjacent_coord) and not self.is_empty(adjacent_coord) and self.get(adjacent_coord).player!= self.next_player:
+            if self.is_valid_coord(adjacent_coord) and not self.is_empty(adjacent_coord) and self.get(adjacent_coord).player!= self.curr_player:
+                return True
+        return False     
+
+    def is_engaged_minimax(self, coord: Coord) -> bool:
+        """Check if there is opponent in the adjacent coordinates to the given coordinate."""
+        for adjacent_coord in coord.iter_adjacent():
+            if self.is_valid_coord(adjacent_coord) and not self.is_empty(adjacent_coord) and self.get(adjacent_coord).player!= self.curr_player:
+                return True
+        return False     
+
+    def is_valid_move_minimax(self, coords : CoordPair) -> bool:
+        """Validate a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
+        if not self.is_valid_coord(coords.src) or not self.is_valid_coord(coords.dst):
+            return False
+        unit = self.get(coords.src)
+        if unit is None or unit.player != self.curr_player:
+            return False
+        if self.get(coords.dst) is not None and unit.repair_amount(self.get(coords.dst))== 0 and self.get(coords.dst)!= unit or self.get(coords.dst) is not None and self.get(coords.dst)!= unit and self.get(coords.dst).player == self.curr_player and self.get(coords.dst).health == 9:
+            return False
+        if abs(coords.src.row-coords.dst.row)> 1 or abs(coords.src.col-coords.dst.col)> 1 :
+            return False
+        if self.is_engaged(coords.src) and (unit.type==UnitType.AI or unit.type==UnitType.Firewall or unit.type==UnitType.Program) and self.get(coords.dst) is None:
+            return False
+        return True
+
+    def is_permissible_move_minimax(self, coords : CoordPair) -> bool:
+        """To verify that attackers and defenders are doing permissible move"""
+        unit = self.get(coords.src)
+        if unit.player == Player.Attacker:
+            # down or right  return false 
+            if (unit.type==UnitType.AI or unit.type==UnitType.Firewall or unit.type==UnitType.Program):
+                if (coords.src.row-coords.dst.row)<0  or (coords.src.col-coords.dst.col)<0 :
+                    return False
+                else:
+                    return True
+            else: 
+                return True
+        else: 
+            # up or left return false
+            if (unit.type==UnitType.AI or unit.type==UnitType.Firewall or unit.type==UnitType.Program):
+                if (coords.src.row-coords.dst.row)>0  or (coords.src.col-coords.dst.col)>0 :
+                    return False
+                else:
+                    return True
+            else: 
+                return True
+                
+    def is_engaged_minimax(self, coord: Coord) -> bool:
+        """Check if there is opponent in the adjacent coordinates to the given coordinate."""
+        for adjacent_coord in coord.iter_adjacent():
+            if self.is_valid_coord(adjacent_coord) and not self.is_empty(adjacent_coord) and self.get(adjacent_coord).player!= self.curr_player:
                 return True
         return False     
     
@@ -389,29 +440,46 @@ class Game:
         self.mod_health(coords.src,-damageToUnit)
         logger.info(f"""{currentUnit.player.name} attacks {destUnit.player.name} and inflicts {damageToDest} damage.
         {destUnit.player.name} inflicts {damageToUnit} damage to {currentUnit.player.name}.""")
-    
+    #mini max call with no print()
+    def attack_unit_mini_max(self, destUnit: Unit, currentUnit: Unit, coords : CoordPair):
+        damageToDest = currentUnit.damage_amount(destUnit)
+        damageToUnit = destUnit.damage_amount(currentUnit)
+        self.mod_health(coords.dst,-damageToDest)
+        self.mod_health(coords.src,-damageToUnit)
     #self destruct
     def self_destruct(self, currentUnit: Unit, coords : CoordPair):
         logger.info(f"{currentUnit.player.name} self destructs")
-        #print(f"{currentUnit.player.name} self destructs")
+        print(f"{currentUnit.player.name} self destructs")
         self.mod_health(coords.src,-currentUnit.health)
         for surounding in coords.src.iter_surrounding():
             collateral = self.get(surounding)
             if self.is_valid_coord(surounding) and collateral is not None:
-                #print(f"{collateral.player.name}'s {collateral.type.name} at {surounding} receives 2 damage")
+                print(f"{collateral.player.name}'s {collateral.type.name} at {surounding} receives 2 damage")
                 logger.info(f"{collateral.player.name}'s {collateral.type.name} at {surounding} receives 2 damage")
                 self.mod_health(surounding,-2)
-
+    # mini max call with no print()
+    def self_destruct_mini_max(self, currentUnit: Unit, coords : CoordPair):
+        self.mod_health(coords.src,-currentUnit.health)
+        for surounding in coords.src.iter_surrounding():
+            collateral = self.get(surounding)
+            if self.is_valid_coord(surounding) and collateral is not None:
+                self.mod_health(surounding,-2)
     # currentUnit repairs destUnit
     def repair_unit(self,destUnit: Unit, currentUnit: Unit, coords : CoordPair ):
         repair = currentUnit.repair_amount(destUnit)
         if repair == 0 or destUnit.health == 9:
-            #print(f"{currentUnit.type.name} can't repair {destUnit.type.name}")
+            print(f"{currentUnit.type.name} can't repair {destUnit.type.name}")
             return False
         logger.info(f"{currentUnit.type.name} repairs {destUnit.type.name} by {repair}")
-        #print(f"{currentUnit.type.name} repairs {destUnit.type.name} by {repair}")
+        print(f"{currentUnit.type.name} repairs {destUnit.type.name} by {repair}")
         self.mod_health(coords.dst,repair)
-
+    # mini max call with no print()
+    def repair_unit_mini_max(self,destUnit: Unit, currentUnit: Unit, coords : CoordPair ):
+        repair = currentUnit.repair_amount(destUnit)
+        if repair == 0 or destUnit.health == 9:
+            return False
+        self.mod_health(coords.dst,repair)
+    
     def perform_move(self, coords : CoordPair) -> Tuple[bool,str]:
         """Validate and perform a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
         if self.is_valid_move(coords) and self.is_permissible_move(coords):
@@ -421,7 +489,7 @@ class Game:
             destUnit = self.get(coords.dst)
             # logger.info(f"{currentUnit.type.name} at {coords.src} moves in on {coords.dst}.")
             #if destUnit is adversary unit, attack it
-            if destUnit is not None and destUnit.player != self.next_player:
+            if destUnit is not None and destUnit.player != self.curr_player:
                 self.attack_unit(destUnit,currentUnit, coords)
             #if destUnit is same unit, self destruct
             elif destUnit==currentUnit:
@@ -439,17 +507,40 @@ class Game:
         
         
         return (False,"invalid move")
+    # mini max call with no print()
+    def perform_move_mini_max(self, coords : CoordPair) -> Tuple[bool,str]:
+        """Validate and perform a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
+        if self.is_valid_move_minimax(coords) and self.is_permissible_move_minimax(coords):  
+            currentUnit = self.get(coords.src)
+            destUnit = self.get(coords.dst)
+            #if destUnit is adversary unit, attack it
+            if destUnit is not None and destUnit.player != self.curr_player:
+                self.attack_unit_mini_max(destUnit,currentUnit, coords)
+            #if destUnit is same unit, self destruct
+            elif destUnit==currentUnit:
+                self.self_destruct_mini_max(currentUnit, coords)
+            #if destUnit is friendly unit, heal
+            elif destUnit is not None:
+                self.repair_unit_mini_max(destUnit, currentUnit, coords)
+            #else, move
+            else:
+                self.set(coords.dst,self.get(coords.src))
+                self.set(coords.src,None)
+            
+            return (True,"")
+        
+        return (False,"invalid move")
 
     def next_turn(self):
         """Transitions game to the next turn."""
-        self.next_player = self.next_player.next()
+        self.curr_player = self.curr_player.next()
         self.turns_played += 1
 
     def to_string(self) -> str:
         """Pretty text representation of the game."""
         dim = self.options.dim
         output = ""
-        output += f"Next player: {self.next_player.name}\n"
+        output += f"Current player: {self.curr_player.name}\n"
         output += f"Turns played: {self.turns_played}\n"
         coord = Coord()
         output += "\n   "
@@ -486,24 +577,24 @@ class Game:
     def read_move(self) -> CoordPair:
         """Read a move from keyboard and return as a CoordPair."""
         while True:
-            s = input(F'Player {self.next_player.name}, enter your move: ')
+            s = input(F'Player {self.curr_player.name}, enter your move: ')
             coords = CoordPair.from_string(s)
             if coords is not None and self.is_valid_coord(coords.src) and self.is_valid_coord(coords.dst):
                 return coords
             else:
                 pass
-                #print('Invalid coordinates! Try again.')
+                print('Invalid coordinates! Try again.')
     
     def human_turn(self):
         """Human player plays a move (or get via broker)."""
         if self.options.broker is not None:
-            #print("Getting next move with auto-retry from game broker...")
+            print("Getting next move with auto-retry from game broker...")
             while True:
                 mv = self.get_move_from_broker()
                 if mv is not None:
                     (success,result) = self.perform_move(mv)
-                    #print(f"Broker {self.next_player.name}: ",end='')
-                    #print(result)
+                    print(f"Broker {self.curr_player.name}: ",end='')
+                    print(result)
                     if success:
                         self.next_turn()
                         break
@@ -513,13 +604,12 @@ class Game:
                 mv = self.read_move()
                 (success,result) = self.perform_move(mv)
                 if success:
-                    #print(f"Player {self.next_player.name}: ",end='')
-                    #print(result)
+                    print(f"Player {self.curr_player.name}: ",end='')
+                    print(result)
                     self.next_turn()
                     break
                 else:
-                    pass
-                    #print("The move is not valid! Try again.")
+                    print("The move is not valid! Try again.")
 
     def computer_turn(self) -> CoordPair | None:
         """Computer plays a move."""
@@ -527,7 +617,7 @@ class Game:
         if mv is not None:
             (success,result) = self.perform_move(mv)
             if success:
-                print(f"Computer {self.next_player.name}: ",end='')
+                print(f"Computer {self.curr_player.name}: ",end='')
                 print(result)
                 self.next_turn()
         return mv
@@ -556,9 +646,9 @@ class Game:
         return Player.Defender
 
     def move_candidates(self) -> Iterable[CoordPair]:
-        """Generate valid move candidates for the next player."""
+        """Generate valid move candidates for the current player."""
         move = CoordPair()
-        for (src,_) in self.player_units(self.next_player):
+        for (src,_) in self.player_units(self.curr_player):
             move.src = src
             for dst in src.iter_adjacent():
                 move.dst = dst
@@ -613,7 +703,7 @@ class Game:
                     elif unit.type == UnitType.Program:
                         unit_counts["Program2"] += 1 
                     else:
-                        unit_counts["AI2"] += 1   
+                        unit_counts["AI2"] += 1  
         return list(unit_counts.values())
     
 
@@ -632,8 +722,9 @@ class Game:
             
             for move in self.move_candidates():
                 gameCopy = self.clone()
-                gameCopy.perform_move(move)
-                gameCopy.next_turn()
+                gameCopy.perform_move_mini_max(move)
+                #we do this as to not increment the number of turns played during minimax
+                gameCopy.curr_player = gameCopy.curr_player.next()
                 newScore= gameCopy.minimax((depth-1), False)[1]
                 if newScore>value:
                     value=newScore
@@ -647,8 +738,8 @@ class Game:
             bestmove = self.random_move()[1]
             for move in self.move_candidates():
                 gameCopy = self.clone()
-                gameCopy.perform_move(move)
-                gameCopy.next_turn()
+                gameCopy.perform_move_mini_max(move)
+                gameCopy.curr_player = gameCopy.curr_player.next()
                 newScore= gameCopy.minimax((depth-1), True)[1]
                 if newScore<value:
                         value=newScore
@@ -663,12 +754,13 @@ class Game:
         """Suggest the next move using minimax alpha beta. TODO: REPLACE RANDOM_MOVE WITH PROPER GAME LOGIC!!!"""
         start_time = datetime.now()
         # (score, move, avg_depth) = self.random_move()
-        (move, score)= self.minimax(self.options.max_depth,True)
+        maximizing = self.curr_player == Player.Attacker
+        (move, score)= self.minimax(self.options.max_depth,maximizing)
         elapsed_seconds = (datetime.now() - start_time).total_seconds()
         self.stats.total_seconds += elapsed_seconds
-        #print(f"Heuristic score: {score}")
-        ##print(f"Average recursive depth: {avg_depth:0.1f}")
-        #print(f"Evals per depth: ",end='')
+        print(f"Heuristic score: {score}")
+        # print(f"Average recursive depth: {avg_depth:0.1f}")
+        print(f"Evals per depth: ",end='')
         for k in sorted(self.stats.evaluations_per_depth.keys()):
             print(f"{k}:{self.stats.evaluations_per_depth[k]} ",end='')
         print()
@@ -690,14 +782,14 @@ class Game:
         try:
             r = requests.post(self.options.broker, json=data)
             if r.status_code == 200 and r.json()['success'] and r.json()['data'] == data:
-                # #print(f"Sent move to broker: {move}")
+                print(f"Sent move to broker: {move}")
                 pass
             else:
-                #print(f"Broker error: status code: {r.status_code}, response: {r.json()}")
-                pass
+                print(f"Broker error: status code: {r.status_code}, response: {r.json()}")
+
         except Exception as error:
-            #print(f"Broker error: {error}")
-            pass
+            print(f"Broker error: {error}")
+
 
     def get_move_from_broker(self) -> CoordPair | None:
         """Get a move from the game broker."""
@@ -714,21 +806,17 @@ class Game:
                             Coord(data['from']['row'],data['from']['col']),
                             Coord(data['to']['row'],data['to']['col'])
                         )
-                        #print(f"Got move from broker: {move}")
+                        print(f"Got move from broker: {move}")
                         return move
                     else:
-                        # #print("Got broker data for wrong turn.")
-                        # #print(f"Wanted {self.turns_played+1}, got {data['turn']}")
-                        pass
+                        print("Got broker data for wrong turn.")
+                        print(f"Wanted {self.turns_played+1}, got {data['turn']}")
                 else:
-                    # #print("Got no data from broker")
-                    pass
+                    print("Got no data from broker")
             else:
-                pass
-                #print(f"Broker error: status code: {r.status_code}, response: {r.json()}")
+                print(f"Broker error: status code: {r.status_code}, response: {r.json()}")
         except Exception as error:
-            #print(f"Broker error: {error}")
-            pass
+            print(f"Broker error: {error}")
         return None
 
 ##############################################################################################################
@@ -784,22 +872,22 @@ def main():
         winner = game.has_winner()
         if winner is not None:
             winningMessage = f"{winner.name} wins!"
-            #print(winningMessage)
+            print(winningMessage)
             logger.info(winningMessage)
             break
         if game.options.game_type == GameType.AttackerVsDefender:
             game.human_turn()
-        elif game.options.game_type == GameType.AttackerVsComp and game.next_player == Player.Attacker:
+        elif game.options.game_type == GameType.AttackerVsComp and game.curr_player == Player.Attacker:
             game.human_turn()
-        elif game.options.game_type == GameType.CompVsDefender and game.next_player == Player.Defender:
+        elif game.options.game_type == GameType.CompVsDefender and game.curr_player == Player.Defender:
             game.human_turn()
         else:
-            player = game.next_player
+            player = game.curr_player
             move = game.computer_turn()
             if move is not None:
                 game.post_move_to_broker(move)
             else:
-                #print("Computer doesn't know what to do!!!")
+                print("Computer doesn't know what to do!!!")
                 exit(1)
     logger.info(f"Game ended after {game.turns_played} turns")
     logging.shutdown()
