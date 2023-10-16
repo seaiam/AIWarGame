@@ -439,7 +439,7 @@ class Game:
             return (True,"")
         
         
-        return (True,"invalid move")
+        return (False,"invalid move")
 
     def next_turn(self):
         """Transitions game to the next turn."""
@@ -645,44 +645,35 @@ class Game:
                     return (None,MIN_HEURISTIC_SCORE)
             else: #depth is 0
                 return (None, self.get_e0(Player.Attacker))
-        if maximizingPlayer and depth>0: #Attacker
+        if maximizingPlayer: #Attacker
             value = -math.inf
             bestmove = self.random_move()
             for move in candidate_move:
                 gameCopy = self.clone()
                 gameCopy.perform_move(move)
-                if depth > 0:
-                    # test = gameCopy.minimax(depth-1, False)
-                    # new_score= test[1]
-                    #if(gameCopy.minimax(depth-1, False)[1] is not None):
-                    new_score= gameCopy.minimax((depth-1), False)[1]
-                    if new_score>value:
-                        value=new_score
-                        bestmove = move
+                new_score= gameCopy.minimax((depth-1), False)[1]
+                if new_score>value:
+                    value=new_score
+                    bestmove = move
             return (bestmove, value)
-        elif not maximizingPlayer and depth>0: #minimizing player so Deffender
+        else: #minimizing player so Deffender
             value = math.inf
             bestmove = self.random_move()
             for move in candidate_move:
                 gameCopy = self.clone()
                 gameCopy.perform_move(move)
-                # if(gameCopy.minimax(depth-1, True)[1] is not None):
-                #     new_score= gameCopy.minimax(depth-1, True)[1]
-                #     if new_score<value:
                 new_score= gameCopy.minimax((depth-1), True)[1]
                 if new_score<value:
                         value=new_score
                         bestmove = move
             return (bestmove, value)
-            
   
     
     def suggest_move(self) -> CoordPair | None:
         """Suggest the next move using minimax alpha beta. TODO: REPLACE RANDOM_MOVE WITH PROPER GAME LOGIC!!!"""
         start_time = datetime.now()
         # (score, move, avg_depth) = self.random_move()
-        (move, score)= self.minimax(3,True)
-        (move, score)= self.minimax(4,False)
+        (move, score)= self.minimax(4,True)
         elapsed_seconds = (datetime.now() - start_time).total_seconds()
         self.stats.total_seconds += elapsed_seconds
         print(f"Heuristic score: {score}")
