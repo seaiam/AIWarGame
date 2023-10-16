@@ -638,38 +638,42 @@ class Game:
         candidate_move = self.move_candidates()
         if depth == 0 or self.is_finished():
             if self.is_finished():
-                winner = self.has_winner().name
-                if winner=="Attacker":
+                winner = self.has_winner()
+                if winner==Player.Attacker:
                     return (None, MAX_HEURISTIC_SCORE)
-                elif winner=="Deffender":
+                elif winner==Player.Defender:
                     return (None,MIN_HEURISTIC_SCORE)
             else: #depth is 0
                 return (None, self.get_e0(Player.Attacker))
-        if maximizingPlayer: #Attacker
+        if maximizingPlayer and depth>0: #Attacker
             value = -math.inf
             bestmove = self.random_move()
             for move in candidate_move:
                 gameCopy = self.clone()
                 gameCopy.perform_move(move)
                 if depth > 0:
-                    test = gameCopy.minimax(depth-1, False)
-                    new_score= test[1]
+                    # test = gameCopy.minimax(depth-1, False)
+                    # new_score= test[1]
+                    #if(gameCopy.minimax(depth-1, False)[1] is not None):
+                    new_score= gameCopy.minimax((depth-1), False)[1]
                     if new_score>value:
                         value=new_score
                         bestmove = move
-                return (bestmove, value)
-        else: #minimizing player so Deffender
+            return (bestmove, value)
+        elif not maximizingPlayer and depth>0: #minimizing player so Deffender
             value = math.inf
             bestmove = self.random_move()
             for move in candidate_move:
                 gameCopy = self.clone()
                 gameCopy.perform_move(move)
-                if depth > 0:
-                    new_score= gameCopy.minimax(depth-1, True)[1]
-                    if new_score<value:
+                # if(gameCopy.minimax(depth-1, True)[1] is not None):
+                #     new_score= gameCopy.minimax(depth-1, True)[1]
+                #     if new_score<value:
+                new_score= gameCopy.minimax((depth-1), True)[1]
+                if new_score<value:
                         value=new_score
                         bestmove = move
-                return (bestmove, value)
+            return (bestmove, value)
             
   
     
@@ -678,6 +682,7 @@ class Game:
         start_time = datetime.now()
         # (score, move, avg_depth) = self.random_move()
         (move, score)= self.minimax(3,True)
+        (move, score)= self.minimax(4,False)
         elapsed_seconds = (datetime.now() - start_time).total_seconds()
         self.stats.total_seconds += elapsed_seconds
         print(f"Heuristic score: {score}")
