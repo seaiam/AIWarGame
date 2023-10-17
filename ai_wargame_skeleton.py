@@ -507,6 +507,7 @@ class Game:
         
         
         return (False,"invalid move")
+    
     # mini max call with no print()
     def perform_move_mini_max(self, coords : CoordPair) -> Tuple[bool,str]:
         """Validate and perform a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
@@ -744,6 +745,54 @@ class Game:
                 if newScore<value:
                         value=newScore
                         bestmove = move
+            if depth == self.options.max_depth:
+                    return (bestmove,value)
+            else:
+                return (None, value)
+            
+    def minimax_alpha_beta (self,  depth: int, alpha, beta, maximizingPlayer: bool)-> dict[CoordPair, int]:
+        if depth == 0:
+            return (None, self.get_e0())
+        elif self.is_finished():
+            winner = self.has_winner()
+            if winner==Player.Attacker:
+                return (None, MAX_HEURISTIC_SCORE)
+            else:
+                return (None,MIN_HEURISTIC_SCORE)
+        elif maximizingPlayer: #Attacker
+            value = MIN_HEURISTIC_SCORE
+            bestmove = self.random_move()[1]
+            
+            for move in self.move_candidates():
+                gameCopy = self.clone()
+                gameCopy.perform_move_mini_max(move)
+                #we do this as to not increment the number of turns played during minimax-alpha-beta
+                gameCopy.curr_player = gameCopy.curr_player.next()
+                newScore= gameCopy.minimax_alpha_beta((depth-1), False)[1]
+                if newScore>value:
+                    value=newScore
+                    bestmove = move
+                alpha = max(alpha, value)
+                if alpha >= beta:
+                    break
+            if depth == self.options.max_depth:
+                    return (bestmove,value)
+            else:
+                return (None, value)
+        else: #minimizing player so Defender
+            value = MAX_HEURISTIC_SCORE
+            bestmove = self.random_move()[1]
+            for move in self.move_candidates():
+                gameCopy = self.clone()
+                gameCopy.perform_move_mini_max(move)
+                gameCopy.curr_player = gameCopy.curr_player.next()
+                newScore= gameCopy.minimax_alpha_beta((depth-1), True)[1]
+                if newScore<value:
+                        value=newScore
+                        bestmove = move
+                beta = min(beta, value)
+                if alpha >= beta:
+                    break
             if depth == self.options.max_depth:
                     return (bestmove,value)
             else:
