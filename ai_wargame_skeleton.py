@@ -773,7 +773,7 @@ class Game:
                     value=newScore
                     bestmove = move
                 alpha = max(alpha, value)
-                if alpha >= beta:
+                if beta <= alpha:
                     break
             if depth == self.options.max_depth:
                     return (bestmove,value)
@@ -791,7 +791,7 @@ class Game:
                         value=newScore
                         bestmove = move
                 beta = min(beta, value)
-                if alpha >= beta:
+                if beta <= alpha:
                     break
             if depth == self.options.max_depth:
                     return (bestmove,value)
