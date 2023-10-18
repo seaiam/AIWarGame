@@ -768,7 +768,7 @@ class Game:
                 gameCopy.perform_move_mini_max(move)
                 #we do this as to not increment the number of turns played during minimax-alpha-beta
                 gameCopy.curr_player = gameCopy.curr_player.next()
-                newScore= gameCopy.minimax_alpha_beta((depth-1), False)[1]
+                newScore= gameCopy.minimax_alpha_beta((depth-1), alpha, beta, False)[1]
                 if newScore>value:
                     value=newScore
                     bestmove = move
@@ -786,7 +786,7 @@ class Game:
                 gameCopy = self.clone()
                 gameCopy.perform_move_mini_max(move)
                 gameCopy.curr_player = gameCopy.curr_player.next()
-                newScore= gameCopy.minimax_alpha_beta((depth-1), True)[1]
+                newScore= gameCopy.minimax_alpha_beta((depth-1), alpha, beta, True)[1]
                 if newScore<value:
                         value=newScore
                         bestmove = move
