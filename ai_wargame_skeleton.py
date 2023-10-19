@@ -805,6 +805,7 @@ class Game:
         # (score, move, avg_depth) = self.random_move()
         maximizing = self.curr_player == Player.Attacker
         (move, score)= self.minimax(self.options.max_depth,maximizing)
+        (move, score)= self.minimax_alpha_beta(self.options.max_depth,float('-inf'), float('inf'),maximizing)
         elapsed_seconds = (datetime.now() - start_time).total_seconds()
         self.stats.total_seconds += elapsed_seconds
         print(f"Heuristic score: {score}")
@@ -880,6 +881,7 @@ def main():
     parser.add_argument('--game_type', type=str, default="manual", help='game type: auto|attacker|defender|manual')
     parser.add_argument('--broker', type=str, help='play via a game broker')
     parser.add_argument('--max_turns', type=int, help='maximum turns' )
+    parser.add_argument('--alpha_beta', type=bool, help='alpha beta' )
     args = parser.parse_args()
 
     # parse the game type
@@ -904,6 +906,8 @@ def main():
         options.broker = args.broker
     if args.max_turns is not None:
         options.max_turns = args.max_turns
+    if args.alpha_beta is not None:
+        options.alpha_beta = args.alpha_beta
 
     # create a new game
     game = Game(options=options)
