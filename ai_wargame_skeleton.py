@@ -242,6 +242,7 @@ class Options:
     game_type : GameType = GameType.AttackerVsDefender
     alpha_beta : bool = True
     max_turns : int | None = 100
+    heuristic : int | None = 0
     randomize_moves : bool = True
     broker : str | None = None
 
@@ -707,10 +708,61 @@ class Game:
                         unit_counts["AI2"] += 1  
         return list(unit_counts.values())
     
+    def get_e1(self) -> int:
+        # player 1 is Attacker, player 2 is defender. This heuristic is related to health, with a focus on harming Defender's AI 
+        # Attacker wants to maximize this heuristic and Defender wants to minimize it
+        # Attacker wants to protect himself but is more offensive than Defender 
+        # Attacker virus can kill defender AI easily. Each unit of health is valued at 60
+        # Attacker program can damage defender AI substantially. Each unit of health is valued at 10
+        # Attacker AI is important as it can lead to losing the game. Each unit of health is valued at 25
+        # Other Attacker pieces are valued at 1 as they are less instrumental to harming the AI
+        # The lower the Defender's AI health, the better. Each unit of AI health is valued at 1000/healthOfAI
+        # Defender Tech can heal Defender's AI substantially and harm Attacker's Virus majorly.  Each unit of Tech health is valued at 50/healthOfTech
+        # Defender Program can  harm Attacker's Virus substantially.  Each unit of Program health is valued at 25/healthOfProgram
+        # The other Defender's pieces can be ignored when calculating damge to Attacker
+        ls = self.count_player_units()
+        e1 = 60*ls[0]+ls[1]+10*ls[2]+25*ls[3]+50/ls[4]+25/ls[5]+1000/ls[6]
+        return e1
+    
+    def count_player_health(self) -> List[int]:   
+        unit_health_count = {
+            "Virus1": 0,
+            "Firewall1": 0,
+            "Program1": 0,
+            "AI1": 0,
+            "Technical2": 0,
+            "Program2": 0,
+            "AI2": 0
+        }
+        for coord in CoordPair.from_dim(self.options.dim).iter_rectangle():
+            unit = self.get(coord)
+            if unit is not None:
+                if unit.player == Player.Attacker:
+                    if unit.type == UnitType.Virus:
+                        unit_health_count["Virus1"] += unit.health
+                    elif unit.type == UnitType.Firewall:
+                        unit_health_count["Firewall1"] +=unit.health
+                    elif unit.type == UnitType.Program:
+                        unit_health_count["Program1"] += unit.health
+                    else:
+                        unit_health_count["AI1"] +=  unit.health
+                else:
+                    if unit.type == UnitType.Tech:
+                         unit_health_count["Technical2"] += unit.health
+                    elif unit.type == UnitType.Program:
+                        unit_health_count["Program2"] += unit.health
+                    elif unit.typ==UnitType.AI:
+                        unit_health_count["AI2"] += unit.health
+        return list(unit_health_count.values())
 
     def minimax (self,  depth: int, maximizingPlayer: bool)-> dict[CoordPair, int]:
         if depth == 0:
-            return (None, self.get_e0())
+            if(self.options.heuristic == 0):
+                 return (None, self.get_e0())
+            elif(self.options.heuristic == 1):
+                return (None, self.get_e1())
+            else:
+                 return (None, self.get_e2())
         elif self.is_finished():
             winner = self.has_winner()
             if winner==Player.Attacker:
@@ -750,9 +802,14 @@ class Game:
             else:
                 return (None, value)
             
-    def minimax_alpha_beta (self,  depth: int, alpha, beta, maximizingPlayer: bool)-> dict[CoordPair, int]:
+    def minimax_alpha_beta (self,  depth: int, alpha: int, beta: int, maximizingPlayer: bool)-> dict[CoordPair, int]:
         if depth == 0:
-            return (None, self.get_e0())
+            if(self.options.heuristic == 0):
+                return (None, self.get_e0())
+            elif(self.options.heuristic == 1):
+                return (None, self.get_e0())
+            else:
+                return (None, self.get_e0())
         elif self.is_finished():
             winner = self.has_winner()
             if winner==Player.Attacker:
@@ -804,8 +861,10 @@ class Game:
         start_time = datetime.now()
         # (score, move, avg_depth) = self.random_move()
         maximizing = self.curr_player == Player.Attacker
-        (move, score)= self.minimax(self.options.max_depth,maximizing)
-        (move, score)= self.minimax_alpha_beta(self.options.max_depth,float('-inf'), float('inf'),maximizing)
+        if(self.options.alpha_beta):
+            (move, score)= self.minimax_alpha_beta(self.options.max_depth, MAX_HEURISTIC_SCORE,MIN_HEURISTIC_SCORE, maximizing)
+        else:
+            (move, score)= self.minimax(self.options.max_depth,maximizing)
         elapsed_seconds = (datetime.now() - start_time).total_seconds()
         self.stats.total_seconds += elapsed_seconds
         print(f"Heuristic score: {score}")
@@ -881,6 +940,7 @@ def main():
     parser.add_argument('--game_type', type=str, default="manual", help='game type: auto|attacker|defender|manual')
     parser.add_argument('--broker', type=str, help='play via a game broker')
     parser.add_argument('--max_turns', type=int, help='maximum turns' )
+    parser.add_argument('--heuristic', type=int, help='chosen heuristic' )
     parser.add_argument('--alpha_beta', type=bool, help='alpha beta' )
     args = parser.parse_args()
 
@@ -906,6 +966,8 @@ def main():
         options.broker = args.broker
     if args.max_turns is not None:
         options.max_turns = args.max_turns
+    if args.heuristic is not None:
+        options.heuristic = args.heuristic
     if args.alpha_beta is not None:
         options.alpha_beta = args.alpha_beta
 
