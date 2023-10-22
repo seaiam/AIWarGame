@@ -164,7 +164,10 @@ class Coord:
         yield Coord(self.row+1,self.col-1)
         yield Coord(self.row-1,self.col+1)
         yield Coord(self.row-1,self.col-1)
-
+    
+    def manhattan_distance(self, other):
+        return abs(self.row - other.row) + abs(self.col - other.col)
+    
     @classmethod
     def from_string(cls, s : str) -> Coord | None:
         """Create a Coord from a string. ex: D2."""
@@ -399,7 +402,11 @@ class Game:
         unit = self.get(coords.src)
         if unit is None or unit.player != self.curr_player:
             return False
-        if self.get(coords.dst) is not None and unit.repair_amount(self.get(coords.dst))== 0 and self.get(coords.dst)!= unit or self.get(coords.dst) is not None and self.get(coords.dst)!= unit and self.get(coords.dst).player == self.curr_player and self.get(coords.dst).health == 9:
+        # if i cant repair friendly unit
+        if self.get(coords.dst) is not None and unit.repair_amount(self.get(coords.dst))== 0 and self.get(coords.dst)!= unit and self.get(coords.dst).player == unit.player:
+            return False
+        # if friendly unit has 9 health
+        if self.get(coords.dst) is not None and self.get(coords.dst)!= unit and self.get(coords.dst).player == self.curr_player and self.get(coords.dst).health == 9:
             return False
         if abs(coords.src.row-coords.dst.row)> 1 or abs(coords.src.col-coords.dst.col)> 1 :
             return False
@@ -417,6 +424,8 @@ class Game:
             if (unit.type==UnitType.AI or unit.type==UnitType.Firewall or unit.type==UnitType.Program):
                 if (coords.src.row-coords.dst.row)<0  or (coords.src.col-coords.dst.col)<0 :
                     return False
+                else:
+                    return True
             else: 
                 return True
         else: 
@@ -724,20 +733,20 @@ class Game:
         # Defender Tech can heal Defender's AI substantially and harm Attacker's Virus majorly.  Each unit of Tech health is valued at 50/healthOfTech
         # Defender Program can  harm Attacker's Virus substantially.  Each unit of Program health is valued at 25/healthOfProgram
         # The other Defender's pieces can be ignored when calculating damge to Attacker
-        ls = self.count_player_units()
-        e1 = 60*ls[0]+ls[1]+10*ls[2]+25*ls[3]
+        ls = self.count_player_health()
+        e1 = 600*ls[0]+ls[1]+10*ls[2]+25*ls[3]
         if ls[4]!=0:
-            e1 += 50/ls[4]
+            e1 += 100/ls[4]
+        else:
+            e1 += 150
+        if ls[5]!=0:
+            e1 += 50/ls[5]
         else:
             e1 += 100
-        if ls[5]!=0:
-            e1 += 25/ls[5]
-        else:
-            e1 += 75
         if ls[6]!=0:
-            e1 += 1000/ls[6]
+            e1 += 2000/ls[6]
         else:
-            e1 += 1500
+            e1 += 9000
         return e1
     
     def count_player_health(self) -> List[int]:   
@@ -767,9 +776,38 @@ class Game:
                          unit_health_count["Technical2"] += unit.health
                     elif unit.type == UnitType.Program:
                         unit_health_count["Program2"] += unit.health
-                    elif unit.typ==UnitType.AI:
+                    elif unit.type==UnitType.AI:
                         unit_health_count["AI2"] += unit.health
         return list(unit_health_count.values())
+    
+    def get_e2(self) -> int:
+        # player 1 is Attacker, player 2 is defender. This heuristic is related to Attacker's unit distancce to Defender's AI
+        # Attacker wants to maximize this heuristic and Defender wants to minimize it [Attacker maximizes the inverse of the distance]
+        # Attacker wants to protect himself but is more offensive than Defender 
+        # Attacker virus can kill defender AI easily. Distance of 1 is preferable. 1000/distanceOfAVtoDA
+        # Attacker program can damage defender AI substantially. 500/distanceOfAPtoDA
+        # we dont want the Attacker AI close to defender's AI as it is dangerous and may lead to losing the game. 5*distanceOfAAtoDA 
+        # Other Attacker pieces are valued at 100/distanceofAXtoDA as they are less instrumental to harming the AI, but still important
+        # The less friendly units are close to the Defender's AI, the better
+        # Defender Tech can heal Defender's AI substantially and harm Attacker's Virus majorly.  Each unit of Tech distance is valued at 60*distanceDTtoDA
+        # Defender Program can  harm Attacker's Virus substantially.  Each unit of Program health is valued at 30*distanceDPtoAV
+        # Defender Program can  harm Attacker's AI substantially.  Each unit of Program health is valued at 30*distanceDPtoAV
+        # The other Defender's pieces can be calculated at 25*distanceofDXtoAX
+        return 0
+    
+    # def get_distance_from_units(self):
+    #     #Distances from Attacker to defender
+    #     unit_distance_count = {
+    #         "AVirusto": 0,
+    #         "Firewall1": 0,
+    #         "Program1": 0,
+    #         "AI1": 0,
+    #         "Technical2": 0,
+    #         "Program2": 0,
+    #         "AI2": 0
+    #     }
+    #     for cell1, cell2 in zip(coord_pair1.iter_rectangle(), coord_pair2.iter_rectangle()):
+    #     distance += cell1.manhattan_distance(cell2)
 
     def minimax (self,  depth: int, maximizingPlayer: bool)-> dict[CoordPair, int]:
         if depth == 0:
@@ -817,9 +855,9 @@ class Game:
             if(self.options.heuristic == 0):
                 return (None, self.get_e0())
             elif(self.options.heuristic == 1):
-                return (None, self.get_e0())
+                return (None, self.get_e1())
             else:
-                return (None, self.get_e0())
+                return (None, self.get_e2())
         elif self.is_finished():
             winner = self.has_winner()
             if winner==Player.Attacker:
@@ -858,8 +896,7 @@ class Game:
                 if beta <= alpha:
                     break
             return (bestmove, value)
-  
-    
+     
     def suggest_move(self) -> CoordPair | None:
         """Suggest the next move using minimax alpha beta. TODO: REPLACE RANDOM_MOVE WITH PROPER GAME LOGIC!!!"""
         start_time = datetime.now()
