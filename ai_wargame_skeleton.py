@@ -295,8 +295,8 @@ class Game:
         """Make a new copy of a game for minimax recursion.
         Shallow copy of everything except the board (options and stats are shared).
         """
-        new = copy.deepcopy(self)
-        # new.board = copy.deepcopy(self.board)
+        new = copy.copy(self)
+        new.board = copy.deepcopy(self.board)
         return new
 
     def is_empty(self, coord : Coord) -> bool:
@@ -343,50 +343,69 @@ class Game:
     def is_valid_move(self, coords : CoordPair) -> bool:
         """Validate a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
         if not self.is_valid_coord(coords.src) or not self.is_valid_coord(coords.dst):
+            print("invalid coords")
             return False
         unit = self.get(coords.src)
         if unit is None or unit.player != self.curr_player:
+            print("unit is not yours to play ")
             return False
-        if self.get(coords.dst) is not None and unit.repair_amount(self.get(coords.dst))== 0 and self.get(coords.dst)!= unit or self.get(coords.dst) is not None and self.get(coords.dst)!= unit and self.get(coords.dst).player == self.curr_player and self.get(coords.dst).health == 9:
+        # if i cant repair friendly unit
+        if self.get(coords.dst) is not None and unit.repair_amount(self.get(coords.dst))== 0 and self.get(coords.dst)!= unit and self.get(coords.dst).player == unit.player:
+            print("if i cant repair friendly unit")
+            return False
+        # if friendly unit has 9 health
+        if self.get(coords.dst) is not None and self.get(coords.dst)!= unit and self.get(coords.dst).player == self.curr_player and self.get(coords.dst).health == 9:
+            print("if friendly unit has 9 health")
             return False
         if abs(coords.src.row-coords.dst.row)> 1 or abs(coords.src.col-coords.dst.col)> 1 :
+            print("move too big more than one unit ")
             return False
         if self.is_engaged(coords.src) and (unit.type==UnitType.AI or unit.type==UnitType.Firewall or unit.type==UnitType.Program) and self.get(coords.dst) is None:
+            print("engaged and dest is none")
             return False
+        print("valid move")
         return True
 
     def is_permissible_move(self, coords : CoordPair) -> bool:
         """To verify that attackers and defenders are doing permissible move"""
         unit = self.get(coords.src)
         if self.get(coords.dst) is not None:
+            print("move permissible") 
             return True
         if unit.player == Player.Attacker:
             # down or right  return false 
             if (unit.type==UnitType.AI or unit.type==UnitType.Firewall or unit.type==UnitType.Program):
                 if (coords.src.row-coords.dst.row)<0  or (coords.src.col-coords.dst.col)<0 :
-                    #print("Wrong move! Attacker's AI, Firewall and Program can only move up or left")
+                    print("move not permissible")
                     return False
                 else:
+                    print("move permissible")                    
                     return True
             else: 
+                print("move permissible")                
                 return True
         else: 
             # up or left return false
             if (unit.type==UnitType.AI or unit.type==UnitType.Firewall or unit.type==UnitType.Program):
                 if (coords.src.row-coords.dst.row)>0  or (coords.src.col-coords.dst.col)>0 :
-                    #print("Wrong move! Defender's AI, Firewall and Program can only move down or right")
+                    print("move not permissible")                    
                     return False
                 else:
+                    print("move permissible")                     
                     return True
             else: 
+                print("move permissible") 
                 return True
+                
                 
     def is_engaged(self, coord: Coord) -> bool:
         """Check if there is opponent in the adjacent coordinates to the given coordinate."""
         for adjacent_coord in coord.iter_adjacent():
             if self.is_valid_coord(adjacent_coord) and not self.is_empty(adjacent_coord) and self.get(adjacent_coord).player!= self.curr_player:
+                print("unit is engaged")               
                 return True
-        return False     
+        print("unit is NOT engaged")
+        return False        
 
     def is_engaged_minimax(self, coord: Coord) -> bool:
         """Check if there is opponent in the adjacent coordinates to the given coordinate."""
@@ -424,26 +443,20 @@ class Game:
             if (unit.type==UnitType.AI or unit.type==UnitType.Firewall or unit.type==UnitType.Program):
                 if (coords.src.row-coords.dst.row)<0  or (coords.src.col-coords.dst.col)<0 :
                     return False
-                else:
+                else:                   
                     return True
-            else: 
+            else:                
                 return True
         else: 
             # up or left return false
             if (unit.type==UnitType.AI or unit.type==UnitType.Firewall or unit.type==UnitType.Program):
-                if (coords.src.row-coords.dst.row)>0  or (coords.src.col-coords.dst.col)>0 :
+                if (coords.src.row-coords.dst.row)>0  or (coords.src.col-coords.dst.col)>0 :                  
                     return False
-                else:
+                else:                     
                     return True
             else: 
                 return True
-                
-    def is_engaged_minimax(self, coord: Coord) -> bool:
-        """Check if there is opponent in the adjacent coordinates to the given coordinate."""
-        for adjacent_coord in coord.iter_adjacent():
-            if self.is_valid_coord(adjacent_coord) and not self.is_empty(adjacent_coord) and self.get(adjacent_coord).player!= self.curr_player:
-                return True
-        return False     
+                     
     
     #destUnit gets attacked by current unit
     def attack_unit(self, destUnit: Unit, currentUnit: Unit, coords : CoordPair):
@@ -480,9 +493,9 @@ class Game:
     # currentUnit repairs destUnit
     def repair_unit(self,destUnit: Unit, currentUnit: Unit, coords : CoordPair ):
         repair = currentUnit.repair_amount(destUnit)
-        if repair == 0 or destUnit.health == 9:
-            print(f"{currentUnit.type.name} can't repair {destUnit.type.name}")
-            return False
+        # if repair == 0 or destUnit.health == 9:
+        #     print(f"{currentUnit.type.name} can't repair {destUnit.type.name}")
+        #     return False
         logger.info(f"{currentUnit.type.name} repairs {destUnit.type.name} by {repair}")
         print(f"{currentUnit.type.name} repairs {destUnit.type.name} by {repair}")
         self.mod_health(coords.dst,repair)
@@ -503,21 +516,24 @@ class Game:
             # logger.info(f"{currentUnit.type.name} at {coords.src} moves in on {coords.dst}.")
             #if destUnit is adversary unit, attack it
             if destUnit is not None and destUnit.player != self.curr_player:
+                print("attacking")
                 self.attack_unit(destUnit,currentUnit, coords)
             #if destUnit is same unit, self destruct
             elif destUnit==currentUnit:
+                print("self destructing")
                 self.self_destruct(currentUnit, coords)
             #if destUnit is friendly unit, heal
-            elif destUnit is not None:
+            elif destUnit is not None and destUnit.player == self.curr_player :
+                print("repairing")
                 self.repair_unit(destUnit, currentUnit, coords)
             #else, move
             else:
+                print("moving")
                 self.set(coords.dst,self.get(coords.src))
                 self.set(coords.src,None)
             
             
             return (True,"")
-        
         
         return (False,"invalid move")
     
