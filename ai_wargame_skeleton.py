@@ -8,6 +8,7 @@ import math
 from time import sleep
 from typing import Tuple, TypeVar, Type, Iterable, ClassVar
 import random
+import time
 import requests
 import logging
 
@@ -354,6 +355,8 @@ class Game:
     def is_permissible_move(self, coords : CoordPair) -> bool:
         """To verify that attackers and defenders are doing permissible move"""
         unit = self.get(coords.src)
+        if self.get(coords.dst) is not None:
+            return True
         if unit.player == Player.Attacker:
             # down or right  return false 
             if (unit.type==UnitType.AI or unit.type==UnitType.Firewall or unit.type==UnitType.Program):
@@ -407,13 +410,13 @@ class Game:
     def is_permissible_move_minimax(self, coords : CoordPair) -> bool:
         """To verify that attackers and defenders are doing permissible move"""
         unit = self.get(coords.src)
+        if self.get(coords.dst) is not None:
+            return True
         if unit.player == Player.Attacker:
             # down or right  return false 
             if (unit.type==UnitType.AI or unit.type==UnitType.Firewall or unit.type==UnitType.Program):
                 if (coords.src.row-coords.dst.row)<0  or (coords.src.col-coords.dst.col)<0 :
                     return False
-                else:
-                    return True
             else: 
                 return True
         else: 
@@ -661,6 +664,7 @@ class Game:
 
     def random_move(self) -> Tuple[int, CoordPair | None, float]:
         """Returns a random move."""
+        random.seed(time.time())
         move_candidates = list(self.move_candidates())
         random.shuffle(move_candidates)
         if len(move_candidates) > 0:
@@ -721,7 +725,19 @@ class Game:
         # Defender Program can  harm Attacker's Virus substantially.  Each unit of Program health is valued at 25/healthOfProgram
         # The other Defender's pieces can be ignored when calculating damge to Attacker
         ls = self.count_player_units()
-        e1 = 60*ls[0]+ls[1]+10*ls[2]+25*ls[3]+50/ls[4]+25/ls[5]+1000/ls[6]
+        e1 = 60*ls[0]+ls[1]+10*ls[2]+25*ls[3]
+        if ls[4]!=0:
+            e1 += 50/ls[4]
+        else:
+            e1 += 100
+        if ls[5]!=0:
+            e1 += 25/ls[5]
+        else:
+            e1 += 75
+        if ls[6]!=0:
+            e1 += 1000/ls[6]
+        else:
+            e1 += 1500
         return e1
     
     def count_player_health(self) -> List[int]:   
@@ -782,10 +798,7 @@ class Game:
                 if newScore>value:
                     value=newScore
                     bestmove = move
-            if depth == self.options.max_depth:
-                    return (bestmove,value)
-            else:
-                return (None, value)
+            return (bestmove, value)
         else: #minimizing player so Deffender
             value = MAX_HEURISTIC_SCORE
             bestmove = self.random_move()[1]
@@ -797,10 +810,7 @@ class Game:
                 if newScore<value:
                         value=newScore
                         bestmove = move
-            if depth == self.options.max_depth:
-                    return (bestmove,value)
-            else:
-                return (None, value)
+            return (bestmove, value)
             
     def minimax_alpha_beta (self,  depth: int, alpha: int, beta: int, maximizingPlayer: bool)-> dict[CoordPair, int]:
         if depth == 0:
@@ -832,10 +842,7 @@ class Game:
                 alpha = max(alpha, value)
                 if beta <= alpha:
                     break
-            if depth == self.options.max_depth:
-                    return (bestmove,value)
-            else:
-                return (None, value)
+            return (bestmove, value)
         else: #minimizing player so Defender
             value = MAX_HEURISTIC_SCORE
             bestmove = self.random_move()[1]
@@ -850,10 +857,7 @@ class Game:
                 beta = min(beta, value)
                 if beta <= alpha:
                     break
-            if depth == self.options.max_depth:
-                    return (bestmove,value)
-            else:
-                return (None, value)
+            return (bestmove, value)
   
     
     def suggest_move(self) -> CoordPair | None:
@@ -862,7 +866,7 @@ class Game:
         # (score, move, avg_depth) = self.random_move()
         maximizing = self.curr_player == Player.Attacker
         if(self.options.alpha_beta):
-            (move, score)= self.minimax_alpha_beta(self.options.max_depth, MAX_HEURISTIC_SCORE,MIN_HEURISTIC_SCORE, maximizing)
+            (move, score)= self.minimax_alpha_beta(self.options.max_depth, MIN_HEURISTIC_SCORE,MAX_HEURISTIC_SCORE, maximizing)
         else:
             (move, score)= self.minimax(self.options.max_depth,maximizing)
         elapsed_seconds = (datetime.now() - start_time).total_seconds()
