@@ -8,6 +8,7 @@ import math
 from time import sleep
 from typing import Tuple, TypeVar, Type, Iterable, ClassVar
 import random
+import time
 import requests
 import logging
 
@@ -163,7 +164,10 @@ class Coord:
         yield Coord(self.row+1,self.col-1)
         yield Coord(self.row-1,self.col+1)
         yield Coord(self.row-1,self.col-1)
-
+    
+    def manhattan_distance(self, other):
+        return abs(self.row - other.row) + abs(self.col - other.col)
+    
     @classmethod
     def from_string(cls, s : str) -> Coord | None:
         """Create a Coord from a string. ex: D2."""
@@ -268,6 +272,9 @@ class Game:
     stats: Stats = field(default_factory=Stats)
     _attacker_has_ai : bool = True
     _defender_has_ai : bool = True
+    unit_position: list[Coord] = field(default_factory=list)
+    listOfCandidateMove: list[int] = field(default_factory=list)
+    count: int = 0
 
     def __post_init__(self):
         """Automatically called after class init to set up the default board state."""
@@ -287,12 +294,28 @@ class Game:
         self.set(Coord(md,md-2),Unit(player=Player.Attacker,type=UnitType.Program))
         self.set(Coord(md-1,md-1),Unit(player=Player.Attacker,type=UnitType.Firewall))
 
+        self.unit_position = [
+            Coord(0, 0), #Defender AI
+            Coord(1, 0), #Defender Tech
+            Coord(0, 1), #Defender Tech
+            Coord(2, 0), #Defender Firewall
+            Coord(0, 2), #Defender Firewall
+            Coord(1, 1), #Defender Program
+            Coord(md, md), #Attacker AI
+            Coord(md-1, md), #Attacker Virus
+            Coord(md, md-1), #Attacker Virus
+            Coord(md-2, md), #Attacker Program
+            Coord(md, md-2), #Attacker Program
+            Coord(md-1, md-1) #Attacker FireWall
+       ]
+
     def clone(self) -> Game: 
         """Make a new copy of a game for minimax recursion.
         Shallow copy of everything except the board (options and stats are shared).
         """
-        new = copy.deepcopy(self)
-        # new.board = copy.deepcopy(self.board)
+        new = copy.copy(self)
+        new.board = copy.deepcopy(self.board)
+        new.unit_position = copy.deepcopy(self.unit_position)
         return new
 
     def is_empty(self, coord : Coord) -> bool:
@@ -310,11 +333,18 @@ class Game:
         """Set contents of a board cell of the game at Coord."""
         if self.is_valid_coord(coord):
             self.board[coord.row][coord.col] = unit
+    
+    def set_position(self, coord : Coord, index: int):
+        """Set contents of our position array  to Coord"""
+        self.unit_position[index] = coord
 
     def remove_dead(self, coord: Coord):
         """Remove unit at Coord if dead."""
         unit = self.get(coord)
         if unit is not None and not unit.is_alive():
+            for i, pos in enumerate(self.unit_position):
+                if pos == coord:
+                    self.set_position(None,i)
             self.set(coord,None)
             if unit.type == UnitType.AI:
                 if unit.player == Player.Attacker:
@@ -339,48 +369,68 @@ class Game:
     def is_valid_move(self, coords : CoordPair) -> bool:
         """Validate a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
         if not self.is_valid_coord(coords.src) or not self.is_valid_coord(coords.dst):
+            # print("invalid coords")
             return False
         unit = self.get(coords.src)
         if unit is None or unit.player != self.curr_player:
+            # print("unit is not yours to play ")
             return False
-        if self.get(coords.dst) is not None and unit.repair_amount(self.get(coords.dst))== 0 and self.get(coords.dst)!= unit or self.get(coords.dst) is not None and self.get(coords.dst)!= unit and self.get(coords.dst).player == self.curr_player and self.get(coords.dst).health == 9:
+        # if i cant repair friendly unit
+        if self.get(coords.dst) is not None and unit.repair_amount(self.get(coords.dst))== 0 and self.get(coords.dst)!= unit and self.get(coords.dst).player == unit.player:
+            # print("if i cant repair friendly unit")
+            return False
+        # if friendly unit has 9 health
+        if self.get(coords.dst) is not None and self.get(coords.dst)!= unit and self.get(coords.dst).player == self.curr_player and self.get(coords.dst).health == 9:
+            # print("if friendly unit has 9 health")
             return False
         if abs(coords.src.row-coords.dst.row)> 1 or abs(coords.src.col-coords.dst.col)> 1 :
+            # print("move too big more than one unit ")
             return False
         if self.is_engaged(coords.src) and (unit.type==UnitType.AI or unit.type==UnitType.Firewall or unit.type==UnitType.Program) and self.get(coords.dst) is None:
+            # print("engaged and dest is none")
             return False
+        # print("valid move")
         return True
 
     def is_permissible_move(self, coords : CoordPair) -> bool:
         """To verify that attackers and defenders are doing permissible move"""
         unit = self.get(coords.src)
+        if self.get(coords.dst) is not None:
+            # print("move permissible") 
+            return True
         if unit.player == Player.Attacker:
             # down or right  return false 
             if (unit.type==UnitType.AI or unit.type==UnitType.Firewall or unit.type==UnitType.Program):
                 if (coords.src.row-coords.dst.row)<0  or (coords.src.col-coords.dst.col)<0 :
-                    #print("Wrong move! Attacker's AI, Firewall and Program can only move up or left")
+                    # print("move not permissible")
                     return False
                 else:
+                    # print("move permissible")                    
                     return True
             else: 
+                # print("move permissible")                
                 return True
         else: 
             # up or left return false
             if (unit.type==UnitType.AI or unit.type==UnitType.Firewall or unit.type==UnitType.Program):
                 if (coords.src.row-coords.dst.row)>0  or (coords.src.col-coords.dst.col)>0 :
-                    #print("Wrong move! Defender's AI, Firewall and Program can only move down or right")
+                    # print("move not permissible")                    
                     return False
                 else:
+                    # print("move permissible")                     
                     return True
             else: 
-                return True
+                # print("move permissible") 
+                return True             
                 
     def is_engaged(self, coord: Coord) -> bool:
         """Check if there is opponent in the adjacent coordinates to the given coordinate."""
         for adjacent_coord in coord.iter_adjacent():
             if self.is_valid_coord(adjacent_coord) and not self.is_empty(adjacent_coord) and self.get(adjacent_coord).player!= self.curr_player:
+                # print("unit is engaged")               
                 return True
-        return False     
+        # print("unit is NOT engaged")
+        return False        
 
     def is_engaged_minimax(self, coord: Coord) -> bool:
         """Check if there is opponent in the adjacent coordinates to the given coordinate."""
@@ -396,7 +446,11 @@ class Game:
         unit = self.get(coords.src)
         if unit is None or unit.player != self.curr_player:
             return False
-        if self.get(coords.dst) is not None and unit.repair_amount(self.get(coords.dst))== 0 and self.get(coords.dst)!= unit or self.get(coords.dst) is not None and self.get(coords.dst)!= unit and self.get(coords.dst).player == self.curr_player and self.get(coords.dst).health == 9:
+        # if i cant repair friendly unit
+        if self.get(coords.dst) is not None and unit.repair_amount(self.get(coords.dst))== 0 and self.get(coords.dst)!= unit and self.get(coords.dst).player == unit.player:
+            return False
+        # if friendly unit has 9 health
+        if self.get(coords.dst) is not None and self.get(coords.dst)!= unit and self.get(coords.dst).player == self.curr_player and self.get(coords.dst).health == 9:
             return False
         if abs(coords.src.row-coords.dst.row)> 1 or abs(coords.src.col-coords.dst.col)> 1 :
             return False
@@ -407,31 +461,26 @@ class Game:
     def is_permissible_move_minimax(self, coords : CoordPair) -> bool:
         """To verify that attackers and defenders are doing permissible move"""
         unit = self.get(coords.src)
+        if self.get(coords.dst) is not None:
+            return True
         if unit.player == Player.Attacker:
             # down or right  return false 
             if (unit.type==UnitType.AI or unit.type==UnitType.Firewall or unit.type==UnitType.Program):
                 if (coords.src.row-coords.dst.row)<0  or (coords.src.col-coords.dst.col)<0 :
                     return False
-                else:
+                else:                   
                     return True
-            else: 
+            else:                
                 return True
         else: 
             # up or left return false
             if (unit.type==UnitType.AI or unit.type==UnitType.Firewall or unit.type==UnitType.Program):
-                if (coords.src.row-coords.dst.row)>0  or (coords.src.col-coords.dst.col)>0 :
+                if (coords.src.row-coords.dst.row)>0  or (coords.src.col-coords.dst.col)>0 :                  
                     return False
-                else:
+                else:                     
                     return True
             else: 
-                return True
-                
-    def is_engaged_minimax(self, coord: Coord) -> bool:
-        """Check if there is opponent in the adjacent coordinates to the given coordinate."""
-        for adjacent_coord in coord.iter_adjacent():
-            if self.is_valid_coord(adjacent_coord) and not self.is_empty(adjacent_coord) and self.get(adjacent_coord).player!= self.curr_player:
-                return True
-        return False     
+                return True                 
     
     #destUnit gets attacked by current unit
     def attack_unit(self, destUnit: Unit, currentUnit: Unit, coords : CoordPair):
@@ -468,9 +517,9 @@ class Game:
     # currentUnit repairs destUnit
     def repair_unit(self,destUnit: Unit, currentUnit: Unit, coords : CoordPair ):
         repair = currentUnit.repair_amount(destUnit)
-        if repair == 0 or destUnit.health == 9:
-            print(f"{currentUnit.type.name} can't repair {destUnit.type.name}")
-            return False
+        # if repair == 0 or destUnit.health == 9:
+        #     print(f"{currentUnit.type.name} can't repair {destUnit.type.name}")
+        #     return False
         logger.info(f"{currentUnit.type.name} repairs {destUnit.type.name} by {repair}")
         print(f"{currentUnit.type.name} repairs {destUnit.type.name} by {repair}")
         self.mod_health(coords.dst,repair)
@@ -484,31 +533,33 @@ class Game:
     def perform_move(self, coords : CoordPair) -> Tuple[bool,str]:
         """Validate and perform a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
         if self.is_valid_move(coords) and self.is_permissible_move(coords):
-            
-            
             currentUnit = self.get(coords.src)
             destUnit = self.get(coords.dst)
             # logger.info(f"{currentUnit.type.name} at {coords.src} moves in on {coords.dst}.")
             #if destUnit is adversary unit, attack it
             if destUnit is not None and destUnit.player != self.curr_player:
+                # print("attacking")
                 self.attack_unit(destUnit,currentUnit, coords)
             #if destUnit is same unit, self destruct
             elif destUnit==currentUnit:
+                # print("self destructing")
                 self.self_destruct(currentUnit, coords)
             #if destUnit is friendly unit, heal
-            elif destUnit is not None:
+            elif destUnit is not None and destUnit.player == self.curr_player :
+                # print("repairing")
                 self.repair_unit(destUnit, currentUnit, coords)
             #else, move
             else:
+                #update unit position
+                for i, pos in enumerate(self.unit_position):
+                    if pos == coords.src:
+                        self.set_position(coords.dst,i)
                 self.set(coords.dst,self.get(coords.src))
-                self.set(coords.src,None)
-            
+                self.set(coords.src,None)      
             
             return (True,"")
         
-        
         return (False,"invalid move")
-    
     # mini max call with no print()
     def perform_move_mini_max(self, coords : CoordPair) -> Tuple[bool,str]:
         """Validate and perform a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
@@ -526,6 +577,10 @@ class Game:
                 self.repair_unit_mini_max(destUnit, currentUnit, coords)
             #else, move
             else:
+                #update unit position
+                for i, pos in enumerate(self.unit_position):
+                    if pos == coords.src:
+                        self.set_position(coords.dst,i)
                 self.set(coords.dst,self.get(coords.src))
                 self.set(coords.src,None)
             
@@ -661,6 +716,7 @@ class Game:
 
     def random_move(self) -> Tuple[int, CoordPair | None, float]:
         """Returns a random move."""
+        random.seed(time.time())
         move_candidates = list(self.move_candidates())
         random.shuffle(move_candidates)
         if len(move_candidates) > 0:
@@ -720,8 +776,20 @@ class Game:
         # Defender Tech can heal Defender's AI substantially and harm Attacker's Virus majorly.  Each unit of Tech health is valued at 50/healthOfTech
         # Defender Program can  harm Attacker's Virus substantially.  Each unit of Program health is valued at 25/healthOfProgram
         # The other Defender's pieces can be ignored when calculating damge to Attacker
-        ls = self.count_player_units()
-        e1 = 60*ls[0]+ls[1]+10*ls[2]+25*ls[3]+50/ls[4]+25/ls[5]+1000/ls[6]
+        ls = self.count_player_health()
+        e1 = 600*ls[0]+ls[1]+10*ls[2]+25*ls[3]
+        if ls[4]!=0:
+            e1 += 100/ls[4]
+        else:
+            e1 += 150
+        if ls[5]!=0:
+            e1 += 50/ls[5]
+        else:
+            e1 += 100
+        if ls[6]!=0:
+            e1 += 2000/ls[6]
+        else:
+            e1 += 9000
         return e1
     
     def count_player_health(self) -> List[int]:   
@@ -751,11 +819,73 @@ class Game:
                          unit_health_count["Technical2"] += unit.health
                     elif unit.type == UnitType.Program:
                         unit_health_count["Program2"] += unit.health
-                    elif unit.typ==UnitType.AI:
+                    elif unit.type==UnitType.AI:
                         unit_health_count["AI2"] += unit.health
         return list(unit_health_count.values())
-
+    
+    def get_e2(self) -> int:
+        # player 1 is Attacker, player 2 is defender. This heuristic is related to Attacker's unit distancce to Defender's AI
+        # Attacker wants to maximize this heuristic and Defender wants to minimize it [Attacker maximizes the inverse of the distance]
+        # Attacker wants to protect himself but is more offensive than Defender 
+        # Attacker virus can kill defender AI easily. Distance of 1 is preferable. 1000/distanceOfAVtoDA
+        # Attacker program can damage defender AI substantially. 500/distanceOfAPtoDA
+        # we dont want the Attacker AI close to defender's AI as it is dangerous and may lead to losing the game. 5*distanceOfAAtoDA 
+        # The less friendly units are close to the Defender's AI, the better
+        # Defender Tech can heal Defender's AI substantially and harm Attacker's Virus majorly.  Each unit of Tech distance is valued at 60*distanceDTtoDA
+        # Defender Program can  harm Attacker's Virus substantially.  Each unit of Program health is valued at 30*distanceDPtoAV
+        # Defender Program can  harm Attacker's AI substantially.  Each unit of Program health is valued at 30*distanceDPtoAV
+        # The other Defender's or Attacker pieces can be ignored
+        ls = self.get_distance_from_units()
+        e2 = 30*ls[5]+30*ls[1]+60*ls[2]+60*ls[7]+5*ls[4]
+        if ls[3]!=0:
+            e2+=500/ls[3]
+        if ls[0]!=0:
+            e2+=1000/ls[3]           
+        return e2
+    
+    def get_distance_from_units(self):
+        #Distances from Attacker to defender
+        unit_distance_count = {
+            "AttackerVirustoDefenderAI": 0, #0
+            "AttackerVirustoDefenderProgram": 0,#1
+            "AttackerVirustoDefenderTech": 0,#2
+            
+            "AttackerProgramtoDefenderAI": 0,#3
+            
+            "AttackerAItoDefenderAI": 0,#4
+            "AttackerAItoDefenderProgram": 0, #5      
+            
+            "AttackerFirewalltoDefenderAI": 0,#6
+            
+            "DefenderAItoDefenderTech": 0 #7
+        }
+        visitedCoord = set()
+        for i, coord1 in enumerate(self.unit_position):
+            for j, coord2 in enumerate(self.unit_position):
+                if i != j and coord1 is not None and coord2 is not None:
+                    distance = coord1.manhattan_distance(coord2)
+                    visited_coordpair1 = (coord1, coord2)
+                    visited_coordpair2 = (coord2, coord1)
+                    
+                    if visited_coordpair1 not in visitedCoord and visited_coordpair2 not in visitedCoord :
+                        if self.get(coord1).player == Player.Attacker and self.get(coord2).player == Player.Defender:
+                            key = f"{self.get(coord1).player}{self.get(coord1).player}to{self.get(coord2).player}{self.get(coord2).player}"
+                            if key in unit_distance_count:
+                                unit_distance_count[key] += distance
+                                visitedCoord.add(visited_coordpair1)
+                                visitedCoord.add(visited_coordpair2)
+                        
+                        elif self.get(coord1).player == Player.Defender and self.get(coord2).player == Player.Defender:
+                            key = f"{self.get(coord1).player}{self.get(coord1).player}to{self.get(coord2).player}{self.get(coord2).player}"
+                            if key in unit_distance_count:
+                                unit_distance_count[key] += distance
+                                visitedCoord.add(visited_coordpair1)
+                                visitedCoord.add(visited_coordpair2)     
+        
+        return list(unit_distance_count.values())                              
+                    
     def minimax (self,  depth: int, maximizingPlayer: bool)-> dict[CoordPair, int]:
+        self.stats.evaluations_per_depth[self.options.max_depth-depth]+=1
         if depth == 0:
             if(self.options.heuristic == 0):
                  return (None, self.get_e0())
@@ -772,7 +902,8 @@ class Game:
         elif maximizingPlayer: #Attacker
             value = MIN_HEURISTIC_SCORE
             bestmove = self.random_move()[1]
-            
+            cand = list(self.move_candidates())
+            self.listOfCandidateMove.append(len(cand))
             for move in self.move_candidates():
                 gameCopy = self.clone()
                 gameCopy.perform_move_mini_max(move)
@@ -782,13 +913,12 @@ class Game:
                 if newScore>value:
                     value=newScore
                     bestmove = move
-            if depth == self.options.max_depth:
-                    return (bestmove,value)
-            else:
-                return (None, value)
+            return (bestmove, value)
         else: #minimizing player so Deffender
             value = MAX_HEURISTIC_SCORE
             bestmove = self.random_move()[1]
+            cand = list(self.move_candidates())
+            self.listOfCandidateMove.append(len(cand))
             for move in self.move_candidates():
                 gameCopy = self.clone()
                 gameCopy.perform_move_mini_max(move)
@@ -797,19 +927,17 @@ class Game:
                 if newScore<value:
                         value=newScore
                         bestmove = move
-            if depth == self.options.max_depth:
-                    return (bestmove,value)
-            else:
-                return (None, value)
+            return (bestmove, value)
             
     def minimax_alpha_beta (self,  depth: int, alpha: int, beta: int, maximizingPlayer: bool)-> dict[CoordPair, int]:
+        self.stats.evaluations_per_depth[self.options.max_depth-depth]+=1
         if depth == 0:
             if(self.options.heuristic == 0):
                 return (None, self.get_e0())
             elif(self.options.heuristic == 1):
-                return (None, self.get_e0())
+                return (None, self.get_e1())
             else:
-                return (None, self.get_e0())
+                return (None, self.get_e2())
         elif self.is_finished():
             winner = self.has_winner()
             if winner==Player.Attacker:
@@ -819,7 +947,8 @@ class Game:
         elif maximizingPlayer: #Attacker
             value = MIN_HEURISTIC_SCORE
             bestmove = self.random_move()[1]
-            
+            cand = list(self.move_candidates())
+            self.listOfCandidateMove.append(len(cand))
             for move in self.move_candidates():
                 gameCopy = self.clone()
                 gameCopy.perform_move_mini_max(move)
@@ -832,13 +961,12 @@ class Game:
                 alpha = max(alpha, value)
                 if beta <= alpha:
                     break
-            if depth == self.options.max_depth:
-                    return (bestmove,value)
-            else:
-                return (None, value)
+            return (bestmove, value)
         else: #minimizing player so Defender
             value = MAX_HEURISTIC_SCORE
             bestmove = self.random_move()[1]
+            cand = list(self.move_candidates())
+            self.listOfCandidateMove.append(len(cand))
             for move in self.move_candidates():
                 gameCopy = self.clone()
                 gameCopy.perform_move_mini_max(move)
@@ -850,33 +978,35 @@ class Game:
                 beta = min(beta, value)
                 if beta <= alpha:
                     break
-            if depth == self.options.max_depth:
-                    return (bestmove,value)
-            else:
-                return (None, value)
-  
-    
+            return (bestmove, value)
+     
     def suggest_move(self) -> CoordPair | None:
         """Suggest the next move using minimax alpha beta. TODO: REPLACE RANDOM_MOVE WITH PROPER GAME LOGIC!!!"""
         start_time = datetime.now()
-        # (score, move, avg_depth) = self.random_move()
         maximizing = self.curr_player == Player.Attacker
         if(self.options.alpha_beta):
-            (move, score)= self.minimax_alpha_beta(self.options.max_depth, MAX_HEURISTIC_SCORE,MIN_HEURISTIC_SCORE, maximizing)
+            (move, score)= self.minimax_alpha_beta(self.options.max_depth, MIN_HEURISTIC_SCORE,MAX_HEURISTIC_SCORE, maximizing)
         else:
             (move, score)= self.minimax(self.options.max_depth,maximizing)
         elapsed_seconds = (datetime.now() - start_time).total_seconds()
         self.stats.total_seconds += elapsed_seconds
+        total_evals = sum(self.stats.evaluations_per_depth.values())
         print(f"Heuristic score: {score}")
-        # print(f"Average recursive depth: {avg_depth:0.1f}")
+        print(f"Cumulative evals: {total_evals} ",end='')
+        print("\n")
         print(f"Evals per depth: ",end='')
         for k in sorted(self.stats.evaluations_per_depth.keys()):
             print(f"{k}:{self.stats.evaluations_per_depth[k]} ",end='')
-        print()
-        total_evals = sum(self.stats.evaluations_per_depth.values())
+        print("\n")
+        print("Cumulative % evals by depth:")
+        for k in sorted(self.stats.evaluations_per_depth.keys()):
+            print(f"{k}:{self.stats.evaluations_per_depth[k]/total_evals*100:0.1f}% ",end='')
         if self.stats.total_seconds > 0:
+            print("\n")
             print(f"Eval perf.: {total_evals/self.stats.total_seconds/1000:0.1f}k/s")
         print(f"Elapsed time: {elapsed_seconds:0.1f}s")
+        average = sum(self.listOfCandidateMove) /len(self.listOfCandidateMove)
+        print(f"Average Branching Factor: {average:0.2f}")
         return move
 
     def post_move_to_broker(self, move: CoordPair):
@@ -973,6 +1103,8 @@ def main():
 
     # create a new game
     game = Game(options=options)
+    for i in range(0,game.options.max_depth+1):
+        game.stats.evaluations_per_depth[i] = 0
     logFileName = f"gameTrace-{options.alpha_beta}-{options.max_time}-{options.max_turns}"
     logging.basicConfig(filename=logFileName,format='%(message)s', level=logging.INFO)
     
