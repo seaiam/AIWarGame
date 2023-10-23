@@ -273,6 +273,21 @@ class Game:
     _attacker_has_ai : bool = True
     _defender_has_ai : bool = True
 
+    unit_position = [
+            Coord(0, 0), #Defender AI
+            Coord(1, 0), #Defender Tech
+            Coord(0, 1), #Defender Tech
+            Coord(2, 0), #Defender Firewall
+            Coord(0, 2), #Defender Firewall
+            Coord(1, 1), #Defender Program
+            Coord(4, 4), #Attacker AI
+            Coord(3, 4), #Attacker Virus
+            Coord(4, 3), #Attacker Virus
+            Coord(2, 4), #Attacker Program
+            Coord(4, 2), #Attacker Program
+            Coord(3,3) #Attacker FireWall
+       ]
+
     def __post_init__(self):
         """Automatically called after class init to set up the default board state."""
         dim = self.options.dim
@@ -398,6 +413,9 @@ class Game:
                 return True
                 
                 
+                
+                    
+                
     def is_engaged(self, coord: Coord) -> bool:
         """Check if there is opponent in the adjacent coordinates to the given coordinate."""
         for adjacent_coord in coord.iter_adjacent():
@@ -455,8 +473,7 @@ class Game:
                 else:                     
                     return True
             else: 
-                return True
-                     
+                return True                 
     
     #destUnit gets attacked by current unit
     def attack_unit(self, destUnit: Unit, currentUnit: Unit, coords : CoordPair):
@@ -509,8 +526,6 @@ class Game:
     def perform_move(self, coords : CoordPair) -> Tuple[bool,str]:
         """Validate and perform a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
         if self.is_valid_move(coords) and self.is_permissible_move(coords):
-            
-            
             currentUnit = self.get(coords.src)
             destUnit = self.get(coords.dst)
             # logger.info(f"{currentUnit.type.name} at {coords.src} moves in on {coords.dst}.")
@@ -528,15 +543,21 @@ class Game:
                 self.repair_unit(destUnit, currentUnit, coords)
             #else, move
             else:
-                print("moving")
+                #update unit position
+                for i, coord in enumerate(self.unit_position):
+                    if coord == coords.src:
+                        self.unit_position[i] = coords.dst
                 self.set(coords.dst,self.get(coords.src))
                 self.set(coords.src,None)
+                self.set(coords.src,None)
+            
+            
+                self.set(coords.src,None)      
             
             
             return (True,"")
         
         return (False,"invalid move")
-    
     # mini max call with no print()
     def perform_move_mini_max(self, coords : CoordPair) -> Tuple[bool,str]:
         """Validate and perform a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
@@ -554,6 +575,10 @@ class Game:
                 self.repair_unit_mini_max(destUnit, currentUnit, coords)
             #else, move
             else:
+                #update unit position
+                for i, coord in enumerate(self.unit_position):
+                    if coord == coords.src:
+                        self.unit_position[i] = coords.dst
                 self.set(coords.dst,self.get(coords.src))
                 self.set(coords.src,None)
             
@@ -803,28 +828,61 @@ class Game:
         # Attacker virus can kill defender AI easily. Distance of 1 is preferable. 1000/distanceOfAVtoDA
         # Attacker program can damage defender AI substantially. 500/distanceOfAPtoDA
         # we dont want the Attacker AI close to defender's AI as it is dangerous and may lead to losing the game. 5*distanceOfAAtoDA 
-        # Other Attacker pieces are valued at 100/distanceofAXtoDA as they are less instrumental to harming the AI, but still important
         # The less friendly units are close to the Defender's AI, the better
         # Defender Tech can heal Defender's AI substantially and harm Attacker's Virus majorly.  Each unit of Tech distance is valued at 60*distanceDTtoDA
         # Defender Program can  harm Attacker's Virus substantially.  Each unit of Program health is valued at 30*distanceDPtoAV
         # Defender Program can  harm Attacker's AI substantially.  Each unit of Program health is valued at 30*distanceDPtoAV
-        # The other Defender's pieces can be calculated at 25*distanceofDXtoAX
-        return 0
+        # The other Defender's or Attacker pieces can be ignored
+        ls = self.get_distance_from_units()
+        e2 = 30*ls[5]+30*ls[1]+60*ls[2]+60*ls[7]+5*ls[4]
+        if ls[3]!=0:
+            e2+=500/ls[3]
+        if ls[0]!=0:
+            e2+=1000/ls[3]           
+        return e2
     
-    # def get_distance_from_units(self):
-    #     #Distances from Attacker to defender
-    #     unit_distance_count = {
-    #         "AVirusto": 0,
-    #         "Firewall1": 0,
-    #         "Program1": 0,
-    #         "AI1": 0,
-    #         "Technical2": 0,
-    #         "Program2": 0,
-    #         "AI2": 0
-    #     }
-    #     for cell1, cell2 in zip(coord_pair1.iter_rectangle(), coord_pair2.iter_rectangle()):
-    #     distance += cell1.manhattan_distance(cell2)
-
+    def get_distance_from_units(self):
+        #Distances from Attacker to defender
+        unit_distance_count = {
+            "AttackerVirustoDefenderAI": 0, #0
+            "AttackerVirustoDefenderProgram": 0,#1
+            "AttackerVirustoDefenderTech": 0,#2
+            
+            "AttackerProgramtoDefenderAI": 0,#3
+            
+            "AttackerAItoDefenderAI": 0,#4
+            "AttackerAItoDefenderProgram": 0, #5      
+            
+            "AttackerFirewalltoDefenderAI": 0,#6
+            
+            "DefenderAItoDefenderTech": 0 #7
+        }
+        visitedCoord = set()
+        for i, coord1 in enumerate(self.unit_position):
+            for j, coord2 in enumerate(self.unit_position):
+                if i != j: 
+                    distance = coord1.manhattan_distance(coord2)
+                    visited_coordpair1 = (coord1, coord2)
+                    visited_coordpair2 = (coord2, coord1)
+                    
+                    if visited_coordpair1 not in visitedCoord and visited_coordpair2 not in visitedCoord:
+                        
+                        if self.get(coord1).player == Player.Attacker and self.get(coord2).player == Player.Defender:
+                            key = f"{self.get(coord1).player}{self.get(coord1).player}to{self.get(coord2).player}{self.get(coord2).player}"
+                            if key in unit_distance_count:
+                                unit_distance_count[key] += distance
+                                visitedCoord.add(visited_coordpair1)
+                                visitedCoord.add(visited_coordpair2)
+                        
+                        elif self.get(coord1).player == Player.Defender and self.get(coord2).player == Player.Defender:
+                            key = f"{self.get(coord1).player}{self.get(coord1).player}to{self.get(coord2).player}{self.get(coord2).player}"
+                            if key in unit_distance_count:
+                                unit_distance_count[key] += distance
+                                visitedCoord.add(visited_coordpair1)
+                                visitedCoord.add(visited_coordpair2)     
+        
+        return list(unit_distance_count.values())                              
+                    
     def minimax (self,  depth: int, maximizingPlayer: bool)-> dict[CoordPair, int]:
         if depth == 0:
             if(self.options.heuristic == 0):
