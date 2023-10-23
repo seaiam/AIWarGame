@@ -273,21 +273,8 @@ class Game:
     _attacker_has_ai : bool = True
     _defender_has_ai : bool = True
     unit_position: list[Coord] = field(default_factory=list)
-
-    # unit_position = [
-    #         Coord(0, 0), #Defender AI
-    #         Coord(1, 0), #Defender Tech
-    #         Coord(0, 1), #Defender Tech
-    #         Coord(2, 0), #Defender Firewall
-    #         Coord(0, 2), #Defender Firewall
-    #         Coord(1, 1), #Defender Program
-    #         Coord(4, 4), #Attacker AI
-    #         Coord(3, 4), #Attacker Virus
-    #         Coord(4, 3), #Attacker Virus
-    #         Coord(2, 4), #Attacker Program
-    #         Coord(4, 2), #Attacker Program
-    #         Coord(3,3) #Attacker FireWall
-    #    ]
+    listOfCandidateMove: list[int] = field(default_factory=list)
+    count: int = 0
 
     def __post_init__(self):
         """Automatically called after class init to set up the default board state."""
@@ -898,6 +885,7 @@ class Game:
         return list(unit_distance_count.values())                              
                     
     def minimax (self,  depth: int, maximizingPlayer: bool)-> dict[CoordPair, int]:
+        self.stats.evaluations_per_depth[self.options.max_depth-depth]+=1
         if depth == 0:
             if(self.options.heuristic == 0):
                  return (None, self.get_e0())
@@ -914,7 +902,8 @@ class Game:
         elif maximizingPlayer: #Attacker
             value = MIN_HEURISTIC_SCORE
             bestmove = self.random_move()[1]
-            
+            cand = list(self.move_candidates())
+            self.listOfCandidateMove.append(len(cand))
             for move in self.move_candidates():
                 gameCopy = self.clone()
                 gameCopy.perform_move_mini_max(move)
@@ -928,6 +917,8 @@ class Game:
         else: #minimizing player so Deffender
             value = MAX_HEURISTIC_SCORE
             bestmove = self.random_move()[1]
+            cand = list(self.move_candidates())
+            self.listOfCandidateMove.append(len(cand))
             for move in self.move_candidates():
                 gameCopy = self.clone()
                 gameCopy.perform_move_mini_max(move)
@@ -939,6 +930,7 @@ class Game:
             return (bestmove, value)
             
     def minimax_alpha_beta (self,  depth: int, alpha: int, beta: int, maximizingPlayer: bool)-> dict[CoordPair, int]:
+        self.stats.evaluations_per_depth[self.options.max_depth-depth]+=1
         if depth == 0:
             if(self.options.heuristic == 0):
                 return (None, self.get_e0())
@@ -955,7 +947,8 @@ class Game:
         elif maximizingPlayer: #Attacker
             value = MIN_HEURISTIC_SCORE
             bestmove = self.random_move()[1]
-            
+            cand = list(self.move_candidates())
+            self.listOfCandidateMove.append(len(cand))
             for move in self.move_candidates():
                 gameCopy = self.clone()
                 gameCopy.perform_move_mini_max(move)
@@ -972,6 +965,8 @@ class Game:
         else: #minimizing player so Defender
             value = MAX_HEURISTIC_SCORE
             bestmove = self.random_move()[1]
+            cand = list(self.move_candidates())
+            self.listOfCandidateMove.append(len(cand))
             for move in self.move_candidates():
                 gameCopy = self.clone()
                 gameCopy.perform_move_mini_max(move)
@@ -988,7 +983,6 @@ class Game:
     def suggest_move(self) -> CoordPair | None:
         """Suggest the next move using minimax alpha beta. TODO: REPLACE RANDOM_MOVE WITH PROPER GAME LOGIC!!!"""
         start_time = datetime.now()
-        # (score, move, avg_depth) = self.random_move()
         maximizing = self.curr_player == Player.Attacker
         if(self.options.alpha_beta):
             (move, score)= self.minimax_alpha_beta(self.options.max_depth, MIN_HEURISTIC_SCORE,MAX_HEURISTIC_SCORE, maximizing)
@@ -996,16 +990,23 @@ class Game:
             (move, score)= self.minimax(self.options.max_depth,maximizing)
         elapsed_seconds = (datetime.now() - start_time).total_seconds()
         self.stats.total_seconds += elapsed_seconds
+        total_evals = sum(self.stats.evaluations_per_depth.values())
         print(f"Heuristic score: {score}")
-        # print(f"Average recursive depth: {avg_depth:0.1f}")
+        print(f"Cumulative evals: {total_evals} ",end='')
+        print("\n")
         print(f"Evals per depth: ",end='')
         for k in sorted(self.stats.evaluations_per_depth.keys()):
             print(f"{k}:{self.stats.evaluations_per_depth[k]} ",end='')
-        print()
-        total_evals = sum(self.stats.evaluations_per_depth.values())
+        print("\n")
+        print("Cumulative % evals by depth:")
+        for k in sorted(self.stats.evaluations_per_depth.keys()):
+            print(f"{k}:{self.stats.evaluations_per_depth[k]/total_evals*100:0.1f}% ",end='')
         if self.stats.total_seconds > 0:
+            print("\n")
             print(f"Eval perf.: {total_evals/self.stats.total_seconds/1000:0.1f}k/s")
         print(f"Elapsed time: {elapsed_seconds:0.1f}s")
+        average = sum(self.listOfCandidateMove) /len(self.listOfCandidateMove)
+        print(f"Average Branching Factor: {average:0.2f}")
         return move
 
     def post_move_to_broker(self, move: CoordPair):
@@ -1102,6 +1103,8 @@ def main():
 
     # create a new game
     game = Game(options=options)
+    for i in range(0,game.options.max_depth+1):
+        game.stats.evaluations_per_depth[i] = 0
     logFileName = f"gameTrace-{options.alpha_beta}-{options.max_time}-{options.max_turns}"
     logging.basicConfig(filename=logFileName,format='%(message)s', level=logging.INFO)
     
