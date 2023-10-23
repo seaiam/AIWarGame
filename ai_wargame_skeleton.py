@@ -314,12 +314,12 @@ class Game:
             Coord(2, 0), #Defender Firewall
             Coord(0, 2), #Defender Firewall
             Coord(1, 1), #Defender Program
-            Coord(4, 4), #Attacker AI
-            Coord(3, 4), #Attacker Virus
-            Coord(4, 3), #Attacker Virus
-            Coord(2, 4), #Attacker Program
-            Coord(4, 2), #Attacker Program
-            Coord(3,3) #Attacker FireWall
+            Coord(md, md), #Attacker AI
+            Coord(md-1, md), #Attacker Virus
+            Coord(md, md-1), #Attacker Virus
+            Coord(md-2, md), #Attacker Program
+            Coord(md, md-2), #Attacker Program
+            Coord(md-1, md-1) #Attacker FireWall
        ]
 
     def clone(self) -> Game: 
@@ -328,6 +328,7 @@ class Game:
         """
         new = copy.copy(self)
         new.board = copy.deepcopy(self.board)
+        new.unit_position = copy.deepcopy(self.unit_position)
         return new
 
     def is_empty(self, coord : Coord) -> bool:
@@ -348,13 +349,15 @@ class Game:
     
     def set_position(self, coord : Coord, index: int):
         """Set contents of our position array  to Coord"""
-        if self.is_valid_coord(coord):
-            self.unit_position[index] = coord
+        self.unit_position[index] = coord
 
     def remove_dead(self, coord: Coord):
         """Remove unit at Coord if dead."""
         unit = self.get(coord)
         if unit is not None and not unit.is_alive():
+            for i, pos in enumerate(self.unit_position):
+                if pos == coord:
+                    self.set_position(None,i)
             self.set(coord,None)
             if unit.type == UnitType.AI:
                 if unit.player == Player.Attacker:
@@ -431,11 +434,7 @@ class Game:
                     return True
             else: 
                 # print("move permissible") 
-                return True
-                
-                
-                
-                    
+                return True             
                 
     def is_engaged(self, coord: Coord) -> bool:
         """Check if there is opponent in the adjacent coordinates to the given coordinate."""
@@ -569,12 +568,7 @@ class Game:
                     if pos == coords.src:
                         self.set_position(coords.dst,i)
                 self.set(coords.dst,self.get(coords.src))
-                self.set(coords.src,None)
-                self.set(coords.src,None)
-            
-            
                 self.set(coords.src,None)      
-            
             
             return (True,"")
         
@@ -597,9 +591,9 @@ class Game:
             #else, move
             else:
                 #update unit position
-                for i, coord in enumerate(self.unit_position):
-                    if coord == coords.src:
-                        self.unit_position[i] = coords.dst
+                for i, pos in enumerate(self.unit_position):
+                    if pos == coords.src:
+                        self.set_position(coords.dst,i)
                 self.set(coords.dst,self.get(coords.src))
                 self.set(coords.src,None)
             
@@ -881,13 +875,12 @@ class Game:
         visitedCoord = set()
         for i, coord1 in enumerate(self.unit_position):
             for j, coord2 in enumerate(self.unit_position):
-                if i != j: 
+                if i != j and coord1 is not None and coord2 is not None:
                     distance = coord1.manhattan_distance(coord2)
                     visited_coordpair1 = (coord1, coord2)
                     visited_coordpair2 = (coord2, coord1)
                     
-                    if visited_coordpair1 not in visitedCoord and visited_coordpair2 not in visitedCoord:
-                        
+                    if visited_coordpair1 not in visitedCoord and visited_coordpair2 not in visitedCoord :
                         if self.get(coord1).player == Player.Attacker and self.get(coord2).player == Player.Defender:
                             key = f"{self.get(coord1).player}{self.get(coord1).player}to{self.get(coord2).player}{self.get(coord2).player}"
                             if key in unit_distance_count:
