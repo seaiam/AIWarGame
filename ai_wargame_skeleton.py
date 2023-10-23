@@ -272,21 +272,22 @@ class Game:
     stats: Stats = field(default_factory=Stats)
     _attacker_has_ai : bool = True
     _defender_has_ai : bool = True
+    unit_position: list[Coord] = field(default_factory=list)
 
-    unit_position = [
-            Coord(0, 0), #Defender AI
-            Coord(1, 0), #Defender Tech
-            Coord(0, 1), #Defender Tech
-            Coord(2, 0), #Defender Firewall
-            Coord(0, 2), #Defender Firewall
-            Coord(1, 1), #Defender Program
-            Coord(4, 4), #Attacker AI
-            Coord(3, 4), #Attacker Virus
-            Coord(4, 3), #Attacker Virus
-            Coord(2, 4), #Attacker Program
-            Coord(4, 2), #Attacker Program
-            Coord(3,3) #Attacker FireWall
-       ]
+    # unit_position = [
+    #         Coord(0, 0), #Defender AI
+    #         Coord(1, 0), #Defender Tech
+    #         Coord(0, 1), #Defender Tech
+    #         Coord(2, 0), #Defender Firewall
+    #         Coord(0, 2), #Defender Firewall
+    #         Coord(1, 1), #Defender Program
+    #         Coord(4, 4), #Attacker AI
+    #         Coord(3, 4), #Attacker Virus
+    #         Coord(4, 3), #Attacker Virus
+    #         Coord(2, 4), #Attacker Program
+    #         Coord(4, 2), #Attacker Program
+    #         Coord(3,3) #Attacker FireWall
+    #    ]
 
     def __post_init__(self):
         """Automatically called after class init to set up the default board state."""
@@ -305,6 +306,21 @@ class Game:
         self.set(Coord(md-2,md),Unit(player=Player.Attacker,type=UnitType.Program))
         self.set(Coord(md,md-2),Unit(player=Player.Attacker,type=UnitType.Program))
         self.set(Coord(md-1,md-1),Unit(player=Player.Attacker,type=UnitType.Firewall))
+
+        self.unit_position = [
+            Coord(0, 0), #Defender AI
+            Coord(1, 0), #Defender Tech
+            Coord(0, 1), #Defender Tech
+            Coord(2, 0), #Defender Firewall
+            Coord(0, 2), #Defender Firewall
+            Coord(1, 1), #Defender Program
+            Coord(4, 4), #Attacker AI
+            Coord(3, 4), #Attacker Virus
+            Coord(4, 3), #Attacker Virus
+            Coord(2, 4), #Attacker Program
+            Coord(4, 2), #Attacker Program
+            Coord(3,3) #Attacker FireWall
+       ]
 
     def clone(self) -> Game: 
         """Make a new copy of a game for minimax recursion.
@@ -329,6 +345,11 @@ class Game:
         """Set contents of a board cell of the game at Coord."""
         if self.is_valid_coord(coord):
             self.board[coord.row][coord.col] = unit
+    
+    def set_position(self, coord : Coord, index: int):
+        """Set contents of our position array  to Coord"""
+        if self.is_valid_coord(coord):
+            self.unit_position[index] = coord
 
     def remove_dead(self, coord: Coord):
         """Remove unit at Coord if dead."""
@@ -358,58 +379,58 @@ class Game:
     def is_valid_move(self, coords : CoordPair) -> bool:
         """Validate a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
         if not self.is_valid_coord(coords.src) or not self.is_valid_coord(coords.dst):
-            print("invalid coords")
+            # print("invalid coords")
             return False
         unit = self.get(coords.src)
         if unit is None or unit.player != self.curr_player:
-            print("unit is not yours to play ")
+            # print("unit is not yours to play ")
             return False
         # if i cant repair friendly unit
         if self.get(coords.dst) is not None and unit.repair_amount(self.get(coords.dst))== 0 and self.get(coords.dst)!= unit and self.get(coords.dst).player == unit.player:
-            print("if i cant repair friendly unit")
+            # print("if i cant repair friendly unit")
             return False
         # if friendly unit has 9 health
         if self.get(coords.dst) is not None and self.get(coords.dst)!= unit and self.get(coords.dst).player == self.curr_player and self.get(coords.dst).health == 9:
-            print("if friendly unit has 9 health")
+            # print("if friendly unit has 9 health")
             return False
         if abs(coords.src.row-coords.dst.row)> 1 or abs(coords.src.col-coords.dst.col)> 1 :
-            print("move too big more than one unit ")
+            # print("move too big more than one unit ")
             return False
         if self.is_engaged(coords.src) and (unit.type==UnitType.AI or unit.type==UnitType.Firewall or unit.type==UnitType.Program) and self.get(coords.dst) is None:
-            print("engaged and dest is none")
+            # print("engaged and dest is none")
             return False
-        print("valid move")
+        # print("valid move")
         return True
 
     def is_permissible_move(self, coords : CoordPair) -> bool:
         """To verify that attackers and defenders are doing permissible move"""
         unit = self.get(coords.src)
         if self.get(coords.dst) is not None:
-            print("move permissible") 
+            # print("move permissible") 
             return True
         if unit.player == Player.Attacker:
             # down or right  return false 
             if (unit.type==UnitType.AI or unit.type==UnitType.Firewall or unit.type==UnitType.Program):
                 if (coords.src.row-coords.dst.row)<0  or (coords.src.col-coords.dst.col)<0 :
-                    print("move not permissible")
+                    # print("move not permissible")
                     return False
                 else:
-                    print("move permissible")                    
+                    # print("move permissible")                    
                     return True
             else: 
-                print("move permissible")                
+                # print("move permissible")                
                 return True
         else: 
             # up or left return false
             if (unit.type==UnitType.AI or unit.type==UnitType.Firewall or unit.type==UnitType.Program):
                 if (coords.src.row-coords.dst.row)>0  or (coords.src.col-coords.dst.col)>0 :
-                    print("move not permissible")                    
+                    # print("move not permissible")                    
                     return False
                 else:
-                    print("move permissible")                     
+                    # print("move permissible")                     
                     return True
             else: 
-                print("move permissible") 
+                # print("move permissible") 
                 return True
                 
                 
@@ -420,9 +441,9 @@ class Game:
         """Check if there is opponent in the adjacent coordinates to the given coordinate."""
         for adjacent_coord in coord.iter_adjacent():
             if self.is_valid_coord(adjacent_coord) and not self.is_empty(adjacent_coord) and self.get(adjacent_coord).player!= self.curr_player:
-                print("unit is engaged")               
+                # print("unit is engaged")               
                 return True
-        print("unit is NOT engaged")
+        # print("unit is NOT engaged")
         return False        
 
     def is_engaged_minimax(self, coord: Coord) -> bool:
@@ -531,22 +552,22 @@ class Game:
             # logger.info(f"{currentUnit.type.name} at {coords.src} moves in on {coords.dst}.")
             #if destUnit is adversary unit, attack it
             if destUnit is not None and destUnit.player != self.curr_player:
-                print("attacking")
+                # print("attacking")
                 self.attack_unit(destUnit,currentUnit, coords)
             #if destUnit is same unit, self destruct
             elif destUnit==currentUnit:
-                print("self destructing")
+                # print("self destructing")
                 self.self_destruct(currentUnit, coords)
             #if destUnit is friendly unit, heal
             elif destUnit is not None and destUnit.player == self.curr_player :
-                print("repairing")
+                # print("repairing")
                 self.repair_unit(destUnit, currentUnit, coords)
             #else, move
             else:
                 #update unit position
-                for i, coord in enumerate(self.unit_position):
-                    if coord == coords.src:
-                        self.unit_position[i] = coords.dst
+                for i, pos in enumerate(self.unit_position):
+                    if pos == coords.src:
+                        self.set_position(coords.dst,i)
                 self.set(coords.dst,self.get(coords.src))
                 self.set(coords.src,None)
                 self.set(coords.src,None)
