@@ -275,7 +275,7 @@ class Game:
     unit_position: list[Coord] = field(default_factory=list)
     listOfCandidateMove: list[int] = field(default_factory=list)
     count: int = 0
-
+    start_time: datetime = None
     def __post_init__(self):
         """Automatically called after class init to set up the default board state."""
         dim = self.options.dim
@@ -308,6 +308,7 @@ class Game:
             Coord(md, md-2), #Attacker Program
             Coord(md-1, md-1) #Attacker FireWall
        ]
+        self.start_time = datetime.now()
 
     def clone(self) -> Game: 
         """Make a new copy of a game for minimax recursion.
@@ -886,13 +887,14 @@ class Game:
                     
     def minimax (self,  depth: int, maximizingPlayer: bool)-> dict[CoordPair, int]:
         self.stats.evaluations_per_depth[self.options.max_depth-depth]+=1
-        if depth == 0:
+        time_difference = datetime.now() - self.start_time
+        if depth == 0 or time_difference.seconds > self.options.max_time - 0.05:
             if(self.options.heuristic == 0):
                  return (None, self.get_e0())
             elif(self.options.heuristic == 1):
                 return (None, self.get_e1())
             else:
-                 return (None, self.get_e2())
+                 return (None, self.get_e2()+self.get_e1())
         elif self.is_finished():
             winner = self.has_winner()
             if winner==Player.Attacker:
@@ -931,13 +933,14 @@ class Game:
             
     def minimax_alpha_beta (self,  depth: int, alpha: int, beta: int, maximizingPlayer: bool)-> dict[CoordPair, int]:
         self.stats.evaluations_per_depth[self.options.max_depth-depth]+=1
-        if depth == 0:
+        time_difference = datetime.now() - self.start_time
+        if depth == 0 or time_difference.seconds > self.options.max_time - 0.05:
             if(self.options.heuristic == 0):
                 return (None, self.get_e0())
             elif(self.options.heuristic == 1):
                 return (None, self.get_e1())
             else:
-                return (None, self.get_e2())
+                return (None, self.get_e2()+self.get_e1())
         elif self.is_finished():
             winner = self.has_winner()
             if winner==Player.Attacker:
@@ -982,13 +985,13 @@ class Game:
      
     def suggest_move(self) -> CoordPair | None:
         """Suggest the next move using minimax alpha beta. TODO: REPLACE RANDOM_MOVE WITH PROPER GAME LOGIC!!!"""
-        start_time = datetime.now()
+        self.start_time = datetime.now()
         maximizing = self.curr_player == Player.Attacker
         if(self.options.alpha_beta):
             (move, score)= self.minimax_alpha_beta(self.options.max_depth, MIN_HEURISTIC_SCORE,MAX_HEURISTIC_SCORE, maximizing)
         else:
             (move, score)= self.minimax(self.options.max_depth,maximizing)
-        elapsed_seconds = (datetime.now() - start_time).total_seconds()
+        elapsed_seconds = (datetime.now() - self.start_time).total_seconds()
         self.stats.total_seconds += elapsed_seconds
         total_evals = sum(self.stats.evaluations_per_depth.values())
         print(f"Heuristic score: {score}")
@@ -1028,7 +1031,6 @@ class Game:
 
         except Exception as error:
             print(f"Broker error: {error}")
-
 
     def get_move_from_broker(self) -> CoordPair | None:
         """Get a move from the game broker."""
@@ -1071,7 +1073,7 @@ def main():
     parser.add_argument('--broker', type=str, help='play via a game broker')
     parser.add_argument('--max_turns', type=int, help='maximum turns' )
     parser.add_argument('--heuristic', type=int, help='chosen heuristic' )
-    parser.add_argument('--alpha_beta', type=bool, help='alpha beta' )
+    parser.add_argument('--alpha_beta', type=str, help='alpha beta' )
     args = parser.parse_args()
 
     # parse the game type
@@ -1099,7 +1101,8 @@ def main():
     if args.heuristic is not None:
         options.heuristic = args.heuristic
     if args.alpha_beta is not None:
-        options.alpha_beta = args.alpha_beta
+        if args.alpha_beta.lower() == "false":
+            options.alpha_beta = False
 
     # create a new game
     game = Game(options=options)
