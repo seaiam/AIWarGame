@@ -892,7 +892,7 @@ class Game:
             elif(self.options.heuristic == 1):
                 return (None, self.get_e1())
             else:
-                 return (None, self.get_e2())
+                 return (None, self.get_e2()+self.get_e1())
         elif self.is_finished():
             winner = self.has_winner()
             if winner==Player.Attacker:
@@ -937,7 +937,7 @@ class Game:
             elif(self.options.heuristic == 1):
                 return (None, self.get_e1())
             else:
-                return (None, self.get_e2())
+                return (None, self.get_e2()+self.get_e1())
         elif self.is_finished():
             winner = self.has_winner()
             if winner==Player.Attacker:
