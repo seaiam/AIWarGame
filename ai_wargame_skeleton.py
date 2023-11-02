@@ -1029,7 +1029,6 @@ class Game:
         except Exception as error:
             print(f"Broker error: {error}")
 
-
     def get_move_from_broker(self) -> CoordPair | None:
         """Get a move from the game broker."""
         if self.options.broker is None:
@@ -1071,7 +1070,7 @@ def main():
     parser.add_argument('--broker', type=str, help='play via a game broker')
     parser.add_argument('--max_turns', type=int, help='maximum turns' )
     parser.add_argument('--heuristic', type=int, help='chosen heuristic' )
-    parser.add_argument('--alpha_beta', type=bool, help='alpha beta' )
+    parser.add_argument('--alpha_beta', type=str, help='alpha beta' )
     args = parser.parse_args()
 
     # parse the game type
@@ -1099,7 +1098,8 @@ def main():
     if args.heuristic is not None:
         options.heuristic = args.heuristic
     if args.alpha_beta is not None:
-        options.alpha_beta = args.alpha_beta
+        if args.alpha_beta.lower() == "false":
+            options.alpha_beta = False
 
     # create a new game
     game = Game(options=options)
