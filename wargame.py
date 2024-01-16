@@ -4,18 +4,13 @@ import copy
 from datetime import datetime
 from enum import Enum
 from dataclasses import dataclass, field
-import math
-from time import sleep
 from typing import Tuple, TypeVar, Type, Iterable, ClassVar
 import random
 import time
-import requests
-import logging
 
-# maximum and minimum values for our heuristic scores (usually represents an end of game condition)
+# maximum and minimum values for our heuristic scores
 MAX_HEURISTIC_SCORE = 2000000000
 MIN_HEURISTIC_SCORE = -2000000000
-logger = logging.getLogger("")
 
 class UnitType(Enum):
     """Every unit type."""
@@ -248,7 +243,6 @@ class Options:
     max_turns : int | None = 100
     heuristic : int | None = 0
     randomize_moves : bool = True
-    broker : str | None = None
 
 ##############################################################################################################
 
@@ -267,6 +261,7 @@ class Game:
     """Representation of the game state."""
     board: list[list[Unit | None]] = field(default_factory=list)
     curr_player: Player = Player.Attacker
+    is_human_turn: bool = True
     turns_played : int = 0
     options: Options = field(default_factory=Options)
     stats: Stats = field(default_factory=Stats)
@@ -368,69 +363,63 @@ class Game:
                 yield dest
 
     def is_valid_move(self, coords : CoordPair) -> bool:
-        """Validate a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
+        """Validate a move expressed as a CoordPair"""
         if not self.is_valid_coord(coords.src) or not self.is_valid_coord(coords.dst):
-            # print("invalid coords")
+            if self.is_human_turn:
+                    print("invalid coords")
             return False
         unit = self.get(coords.src)
         if unit is None or unit.player != self.curr_player:
-            # print("unit is not yours to play ")
+            if self.is_human_turn:
+                    print("unit is not yours to play ")
             return False
         # if i cant repair friendly unit
         if self.get(coords.dst) is not None and unit.repair_amount(self.get(coords.dst))== 0 and self.get(coords.dst)!= unit and self.get(coords.dst).player == unit.player:
-            # print("if i cant repair friendly unit")
             return False
         # if friendly unit has 9 health
         if self.get(coords.dst) is not None and self.get(coords.dst)!= unit and self.get(coords.dst).player == self.curr_player and self.get(coords.dst).health == 9:
-            # print("if friendly unit has 9 health")
             return False
         if abs(coords.src.row-coords.dst.row)> 1 or abs(coords.src.col-coords.dst.col)> 1 :
-            # print("move too big more than one unit ")
+            if self.is_human_turn:
+                print("You cannot move more than one unit at a time")
             return False
         if self.is_engaged(coords.src) and (unit.type==UnitType.AI or unit.type==UnitType.Firewall or unit.type==UnitType.Program) and self.get(coords.dst) is None:
-            # print("engaged and dest is none")
             return False
-        # print("valid move")
         return True
 
     def is_permissible_move(self, coords : CoordPair) -> bool:
         """To verify that attackers and defenders are doing permissible move"""
         unit = self.get(coords.src)
         if self.get(coords.dst) is not None:
-            # print("move permissible") 
             return True
         if unit.player == Player.Attacker:
             # down or right  return false 
             if (unit.type==UnitType.AI or unit.type==UnitType.Firewall or unit.type==UnitType.Program):
                 if (coords.src.row-coords.dst.row)<0  or (coords.src.col-coords.dst.col)<0 :
-                    # print("move not permissible")
+                    if self.is_human_turn:
+                        print("This move is not permissible for this unit type")
                     return False
-                else:
-                    # print("move permissible")                    
+                else:                
                     return True
-            else: 
-                # print("move permissible")                
+            else:              
                 return True
         else: 
             # up or left return false
             if (unit.type==UnitType.AI or unit.type==UnitType.Firewall or unit.type==UnitType.Program):
                 if (coords.src.row-coords.dst.row)>0  or (coords.src.col-coords.dst.col)>0 :
-                    # print("move not permissible")                    
+                    if self.is_human_turn:
+                        print("This move is not permissible for this unit type")                  
                     return False
-                else:
-                    # print("move permissible")                     
+                else:                     
                     return True
             else: 
-                # print("move permissible") 
                 return True             
                 
     def is_engaged(self, coord: Coord) -> bool:
         """Check if there is opponent in the adjacent coordinates to the given coordinate."""
         for adjacent_coord in coord.iter_adjacent():
-            if self.is_valid_coord(adjacent_coord) and not self.is_empty(adjacent_coord) and self.get(adjacent_coord).player!= self.curr_player:
-                # print("unit is engaged")               
+            if self.is_valid_coord(adjacent_coord) and not self.is_empty(adjacent_coord) and self.get(adjacent_coord).player!= self.curr_player:            
                 return True
-        # print("unit is NOT engaged")
         return False        
 
     def is_engaged_minimax(self, coord: Coord) -> bool:
@@ -441,7 +430,7 @@ class Game:
         return False     
 
     def is_valid_move_minimax(self, coords : CoordPair) -> bool:
-        """Validate a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
+        """Validate a move expressed as a CoordPair."""
         if not self.is_valid_coord(coords.src) or not self.is_valid_coord(coords.dst):
             return False
         unit = self.get(coords.src)
@@ -489,65 +478,44 @@ class Game:
         damageToUnit = destUnit.damage_amount(currentUnit)
         self.mod_health(coords.dst,-damageToDest)
         self.mod_health(coords.src,-damageToUnit)
-        logger.info(f"""{currentUnit.player.name} attacks {destUnit.player.name} and inflicts {damageToDest} damage.
-        {destUnit.player.name} inflicts {damageToUnit} damage to {currentUnit.player.name}.""")
-    #mini max call with no print()
-    def attack_unit_mini_max(self, destUnit: Unit, currentUnit: Unit, coords : CoordPair):
-        damageToDest = currentUnit.damage_amount(destUnit)
-        damageToUnit = destUnit.damage_amount(currentUnit)
-        self.mod_health(coords.dst,-damageToDest)
-        self.mod_health(coords.src,-damageToUnit)
+
     #self destruct
     def self_destruct(self, currentUnit: Unit, coords : CoordPair):
-        logger.info(f"{currentUnit.player.name} self destructs")
-        print(f"{currentUnit.player.name} self destructs")
+        if self.is_human_turn:
+            print(f"{currentUnit.player.name} self destructs")
         self.mod_health(coords.src,-currentUnit.health)
         for surounding in coords.src.iter_surrounding():
             collateral = self.get(surounding)
             if self.is_valid_coord(surounding) and collateral is not None:
-                print(f"{collateral.player.name}'s {collateral.type.name} at {surounding} receives 2 damage")
-                logger.info(f"{collateral.player.name}'s {collateral.type.name} at {surounding} receives 2 damage")
-                self.mod_health(surounding,-2)
-    # mini max call with no print()
-    def self_destruct_mini_max(self, currentUnit: Unit, coords : CoordPair):
-        self.mod_health(coords.src,-currentUnit.health)
-        for surounding in coords.src.iter_surrounding():
-            collateral = self.get(surounding)
-            if self.is_valid_coord(surounding) and collateral is not None:
+                if self.is_human_turn:
+                    print(f"{collateral.player.name}'s {collateral.type.name} at {surounding} receives 2 damage")
                 self.mod_health(surounding,-2)
     # currentUnit repairs destUnit
     def repair_unit(self,destUnit: Unit, currentUnit: Unit, coords : CoordPair ):
         repair = currentUnit.repair_amount(destUnit)
-        # if repair == 0 or destUnit.health == 9:
-        #     print(f"{currentUnit.type.name} can't repair {destUnit.type.name}")
-        #     return False
-        logger.info(f"{currentUnit.type.name} repairs {destUnit.type.name} by {repair}")
-        print(f"{currentUnit.type.name} repairs {destUnit.type.name} by {repair}")
+        if self.is_human_turn:
+            print(f"{currentUnit.type.name} repairs {destUnit.type.name} by {repair}")
         self.mod_health(coords.dst,repair)
-    # mini max call with no print()
-    def repair_unit_mini_max(self,destUnit: Unit, currentUnit: Unit, coords : CoordPair ):
-        repair = currentUnit.repair_amount(destUnit)
-        if repair == 0 or destUnit.health == 9:
-            return False
-        self.mod_health(coords.dst,repair)
-    
+
     def perform_move(self, coords : CoordPair) -> Tuple[bool,str]:
-        """Validate and perform a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
+        """Validate and perform a move expressed as a CoordPair."""
         if self.is_valid_move(coords) and self.is_permissible_move(coords):
             currentUnit = self.get(coords.src)
             destUnit = self.get(coords.dst)
-            # logger.info(f"{currentUnit.type.name} at {coords.src} moves in on {coords.dst}.")
             #if destUnit is adversary unit, attack it
             if destUnit is not None and destUnit.player != self.curr_player:
-                # print("attacking")
+                if self.is_human_turn:
+                    print("attacking")
                 self.attack_unit(destUnit,currentUnit, coords)
             #if destUnit is same unit, self destruct
             elif destUnit==currentUnit:
-                # print("self destructing")
+                if self.is_human_turn:
+                     print("self destructing")
                 self.self_destruct(currentUnit, coords)
             #if destUnit is friendly unit, heal
             elif destUnit is not None and destUnit.player == self.curr_player :
-                # print("repairing")
+                if self.is_human_turn:
+                    print("repairing")
                 self.repair_unit(destUnit, currentUnit, coords)
             #else, move
             else:
@@ -557,33 +525,6 @@ class Game:
                         self.set_position(coords.dst,i)
                 self.set(coords.dst,self.get(coords.src))
                 self.set(coords.src,None)      
-            
-            return (True,"")
-        
-        return (False,"invalid move")
-    # mini max call with no print()
-    def perform_move_mini_max(self, coords : CoordPair) -> Tuple[bool,str]:
-        """Validate and perform a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
-        if self.is_valid_move_minimax(coords) and self.is_permissible_move_minimax(coords):  
-            currentUnit = self.get(coords.src)
-            destUnit = self.get(coords.dst)
-            #if destUnit is adversary unit, attack it
-            if destUnit is not None and destUnit.player != self.curr_player:
-                self.attack_unit_mini_max(destUnit,currentUnit, coords)
-            #if destUnit is same unit, self destruct
-            elif destUnit==currentUnit:
-                self.self_destruct_mini_max(currentUnit, coords)
-            #if destUnit is friendly unit, heal
-            elif destUnit is not None:
-                self.repair_unit_mini_max(destUnit, currentUnit, coords)
-            #else, move
-            else:
-                #update unit position
-                for i, pos in enumerate(self.unit_position):
-                    if pos == coords.src:
-                        self.set_position(coords.dst,i)
-                self.set(coords.dst,self.get(coords.src))
-                self.set(coords.src,None)
             
             return (True,"")
         
@@ -644,21 +585,8 @@ class Game:
                 print('Invalid coordinates! Try again.')
     
     def human_turn(self):
-        """Human player plays a move (or get via broker)."""
-        if self.options.broker is not None:
-            print("Getting next move with auto-retry from game broker...")
-            while True:
-                mv = self.get_move_from_broker()
-                if mv is not None:
-                    (success,result) = self.perform_move(mv)
-                    print(f"Broker {self.curr_player.name}: ",end='')
-                    print(result)
-                    if success:
-                        self.next_turn()
-                        break
-                sleep(0.1)
-        else:
-            while True:
+        self.is_human_turn = True
+        while True:
                 mv = self.read_move()
                 (success,result) = self.perform_move(mv)
                 if success:
@@ -671,6 +599,7 @@ class Game:
 
     def computer_turn(self) -> CoordPair | None:
         """Computer plays a move."""
+        self.is_human_turn = False
         mv = self.suggest_move()
         if mv is not None:
             (success,result) = self.perform_move(mv)
@@ -694,7 +623,7 @@ class Game:
     def has_winner(self) -> Player | None:
         """Check if the game is over and returns winner"""
         if self.options.max_turns is not None and self.turns_played >= self.options.max_turns:
-            #print("Maximum number of turns reached.")
+            print("Maximum number of turns reached.")
             return Player.Defender
         if self._attacker_has_ai:
             if self._defender_has_ai:
@@ -908,7 +837,7 @@ class Game:
             self.listOfCandidateMove.append(len(cand))
             for move in self.move_candidates():
                 gameCopy = self.clone()
-                gameCopy.perform_move_mini_max(move)
+                gameCopy.perform_move(move)
                 #we do this as to not increment the number of turns played during minimax
                 gameCopy.curr_player = gameCopy.curr_player.next()
                 newScore= gameCopy.minimax((depth-1), False)[1]
@@ -923,7 +852,7 @@ class Game:
             self.listOfCandidateMove.append(len(cand))
             for move in self.move_candidates():
                 gameCopy = self.clone()
-                gameCopy.perform_move_mini_max(move)
+                gameCopy.perform_move(move)
                 gameCopy.curr_player = gameCopy.curr_player.next()
                 newScore= gameCopy.minimax((depth-1), True)[1]
                 if newScore<value:
@@ -954,7 +883,7 @@ class Game:
             self.listOfCandidateMove.append(len(cand))
             for move in self.move_candidates():
                 gameCopy = self.clone()
-                gameCopy.perform_move_mini_max(move)
+                gameCopy.perform_move(move)
                 #we do this as to not increment the number of turns played during minimax-alpha-beta
                 gameCopy.curr_player = gameCopy.curr_player.next()
                 newScore= gameCopy.minimax_alpha_beta((depth-1), alpha, beta, False)[1]
@@ -972,7 +901,7 @@ class Game:
             self.listOfCandidateMove.append(len(cand))
             for move in self.move_candidates():
                 gameCopy = self.clone()
-                gameCopy.perform_move_mini_max(move)
+                gameCopy.perform_move(move)
                 gameCopy.curr_player = gameCopy.curr_player.next()
                 newScore= gameCopy.minimax_alpha_beta((depth-1), alpha, beta, True)[1]
                 if newScore<value:
@@ -984,7 +913,7 @@ class Game:
             return (bestmove, value)
      
     def suggest_move(self) -> CoordPair | None:
-        """Suggest the next move using minimax alpha beta. TODO: REPLACE RANDOM_MOVE WITH PROPER GAME LOGIC!!!"""
+        """Suggest the next move using minimax alpha beta."""
         self.start_time = datetime.now()
         maximizing = self.curr_player == Player.Attacker
         if(self.options.alpha_beta):
@@ -1012,54 +941,6 @@ class Game:
         print(f"Average Branching Factor: {average:0.2f}")
         return move
 
-    def post_move_to_broker(self, move: CoordPair):
-        """Send a move to the game broker."""
-        if self.options.broker is None:
-            return
-        data = {
-            "from": {"row": move.src.row, "col": move.src.col},
-            "to": {"row": move.dst.row, "col": move.dst.col},
-            "turn": self.turns_played
-        }
-        try:
-            r = requests.post(self.options.broker, json=data)
-            if r.status_code == 200 and r.json()['success'] and r.json()['data'] == data:
-                print(f"Sent move to broker: {move}")
-                pass
-            else:
-                print(f"Broker error: status code: {r.status_code}, response: {r.json()}")
-
-        except Exception as error:
-            print(f"Broker error: {error}")
-
-    def get_move_from_broker(self) -> CoordPair | None:
-        """Get a move from the game broker."""
-        if self.options.broker is None:
-            return None
-        headers = {'Accept': 'application/json'}
-        try:
-            r = requests.get(self.options.broker, headers=headers)
-            if r.status_code == 200 and r.json()['success']:
-                data = r.json()['data']
-                if data is not None:
-                    if data['turn'] == self.turns_played+1:
-                        move = CoordPair(
-                            Coord(data['from']['row'],data['from']['col']),
-                            Coord(data['to']['row'],data['to']['col'])
-                        )
-                        print(f"Got move from broker: {move}")
-                        return move
-                    else:
-                        print("Got broker data for wrong turn.")
-                        print(f"Wanted {self.turns_played+1}, got {data['turn']}")
-                else:
-                    print("Got no data from broker")
-            else:
-                print(f"Broker error: status code: {r.status_code}, response: {r.json()}")
-        except Exception as error:
-            print(f"Broker error: {error}")
-        return None
-
 ##############################################################################################################
 
 def main():
@@ -1070,7 +951,6 @@ def main():
     parser.add_argument('--max_depth', type=int, help='maximum search depth')
     parser.add_argument('--max_time', type=float, help='maximum search time')
     parser.add_argument('--game_type', type=str, default="manual", help='game type: auto|attacker|defender|manual')
-    parser.add_argument('--broker', type=str, help='play via a game broker')
     parser.add_argument('--max_turns', type=int, help='maximum turns' )
     parser.add_argument('--heuristic', type=int, help='chosen heuristic' )
     parser.add_argument('--alpha_beta', type=str, help='alpha beta' )
@@ -1094,8 +974,6 @@ def main():
         options.max_depth = args.max_depth
     if args.max_time is not None:
         options.max_time = args.max_time
-    if args.broker is not None:
-        options.broker = args.broker
     if args.max_turns is not None:
         options.max_turns = args.max_turns
     if args.heuristic is not None:
@@ -1109,21 +987,16 @@ def main():
     for i in range(0,game.options.max_depth+1):
         game.stats.evaluations_per_depth[i] = 0
     logFileName = f"gameTrace-{options.alpha_beta}-{options.max_time}-{options.max_turns}"
-    logging.basicConfig(filename=logFileName,format='%(message)s', level=logging.INFO)
-    
     gameParameters = f"""The value of the timeout is {options.max_time} seconds.\nThe max number of turns {options.max_turns}.\nThe game type is {game_type.name}. """
     
-    logger.info(gameParameters)
     # the main game loop
     while True:
         print()
         print(game)
-        logger.info(f"\n{game}")
         winner = game.has_winner()
         if winner is not None:
             winningMessage = f"{winner.name} wins!"
             print(winningMessage)
-            logger.info(winningMessage)
             break
         if game.options.game_type == GameType.AttackerVsDefender:
             game.human_turn()
@@ -1134,13 +1007,6 @@ def main():
         else:
             player = game.curr_player
             move = game.computer_turn()
-            if move is not None:
-                game.post_move_to_broker(move)
-            else:
-                print("Computer doesn't know what to do!!!")
-                exit(1)
-    logger.info(f"Game ended after {game.turns_played} turns")
-    logging.shutdown()
 ##############################################################################################################
 
 if __name__ == '__main__':
